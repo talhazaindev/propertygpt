@@ -32,7 +32,7 @@ async function isAdminOrStaff(req: NextRequest) {
 
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check admin/staff authorization
@@ -46,7 +46,7 @@ export async function GET(
     }
 
     // Get ID from params (properly awaited)
-    const id = context.params.id;
+    const { id } = await context.params;
     
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ 
@@ -85,7 +85,7 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check admin/staff authorization
@@ -99,7 +99,7 @@ export async function PATCH(
     }
     
     // Get ID from params (properly awaited)
-    const id = context.params.id;
+    const { id } = await context.params;
     
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ 

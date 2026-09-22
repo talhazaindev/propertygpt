@@ -9,16 +9,10 @@ import { BadgeCheck, Bed, Bath, Square, MapPin, Calendar, Phone, Mail, Loader2 }
 import { useParams } from "next/navigation";
 import placeholderImage from '../../../../public/images/placeholder.js';
 
-interface PropertyDetailPageProps {
-  params: {
-    id: string;
-  };
-}
-
 // Simple gray box data URI as final fallback
 const FALLBACK_IMAGE = placeholderImage;
 
-export default function PropertyDetailPage({ params }: PropertyDetailPageProps) {
+export default function PropertyDetailPage() {
   const routeParams = useParams();
   const id = routeParams.id as string;
   

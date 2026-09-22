@@ -4,12 +4,12 @@ import prisma from "@/lib/prismadb";
 // GET a specific user
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // In a production app, you'd want to add admin authentication checks here
     
-    const userId = params.id;
+    const { id: userId } = await params;
     
     if (!userId) {
       return NextResponse.json(
@@ -53,12 +53,12 @@ export async function GET(
 // UPDATE a specific user
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // In a production app, you'd want to add admin authentication checks here
     
-    const userId = params.id;
+    const { id: userId } = await params;
     const body = await request.json();
     
     if (!userId) {
@@ -128,12 +128,12 @@ export async function PATCH(
 // DELETE a specific user
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // In a production app, you'd want to add admin authentication checks here
     
-    const userId = params.id;
+    const { id: userId } = await params;
     
     if (!userId) {
       return NextResponse.json(

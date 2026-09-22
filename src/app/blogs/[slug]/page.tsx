@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { 
   BookOpen, Tag, Clock, User, ArrowLeft, Share2
 } from "lucide-react";
@@ -26,8 +26,10 @@ interface Blog {
   } | null;
 }
 
-export default function BlogDetailPage({ params }: { params: { slug: string } }) {
+export default function BlogDetailPage() {
   const router = useRouter();
+  const routeParams = useParams();
+  const slug = routeParams.slug as string;
   const [blog, setBlog] = useState<Blog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +40,7 @@ export default function BlogDetailPage({ params }: { params: { slug: string } })
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/blogs/${params.slug}`);
+        const response = await fetch(`/api/blogs/${slug}`);
         
         if (response.status === 404) {
           router.push("/blogs");
@@ -60,7 +62,7 @@ export default function BlogDetailPage({ params }: { params: { slug: string } })
     };
 
     fetchBlog();
-  }, [params.slug, router]);
+  }, [slug, router]);
 
   // Format date
   const formatDate = (dateString: string) => {

@@ -31,9 +31,9 @@ async function isAdminOrStaff(req: NextRequest) {
 }
 
 interface RequestParams {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export async function GET(request: NextRequest, { params }: RequestParams) {
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest, { params }: RequestParams) {
       }, { status: 403 });
     }
     
-    const id = params.id;
+    const { id } = await params;
     
     // Validate ObjectId
     if (!ObjectId.isValid(id)) {
@@ -99,7 +99,7 @@ export async function PATCH(request: NextRequest, { params }: RequestParams) {
       }, { status: 403 });
     }
     
-    const id = params.id;
+    const { id } = await params;
     
     // Validate ObjectId
     if (!ObjectId.isValid(id)) {
@@ -184,7 +184,7 @@ export async function DELETE(request: NextRequest, { params }: RequestParams) {
       }, { status: 403 });
     }
     
-    const id = params.id;
+    const { id } = await params;
     
     // Validate ObjectId
     if (!ObjectId.isValid(id)) {

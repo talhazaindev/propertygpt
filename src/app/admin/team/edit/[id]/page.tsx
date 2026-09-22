@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -52,12 +52,10 @@ const formSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
-export default function EditTeamMemberPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default function EditTeamMemberPage() {
   const router = useRouter();
+  const routeParams = useParams();
+  const id = routeParams.id as string;
   const [isLoading, setIsLoading] = useState(false);
   const [cities, setCities] = useState<any[]>([]);
   const [teamMember, setTeamMember] = useState<any>(null);
@@ -82,7 +80,7 @@ export default function EditTeamMemberPage({
       setIsLoading(true);
       try {
         // Fetch team member data
-        const memberResponse = await fetch(`/api/admin/team/${params.id}`, {
+        const memberResponse = await fetch(`/api/admin/team/${id}`, {
           headers: {
             'x-admin-auth': 'true'
           }
@@ -123,7 +121,7 @@ export default function EditTeamMemberPage({
     };
 
     fetchData();
-  }, [params.id, form]);
+  }, [id, form]);
 
   // Handle form submission
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -135,7 +133,7 @@ export default function EditTeamMemberPage({
         delete submitData.password;
       }
 
-      const response = await fetch(`/api/admin/team/${params.id}`, {
+      const response = await fetch(`/api/admin/team/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

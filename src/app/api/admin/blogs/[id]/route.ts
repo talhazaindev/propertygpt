@@ -33,10 +33,10 @@ interface TeamMemberDocument {
 // GET /api/admin/blogs/[id] - Get a specific blog
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
     const session = await getServerSession(authOptions);
 
     // Check if user is authenticated
@@ -111,10 +111,10 @@ export async function GET(
 // PUT /api/admin/blogs/[id] - Update a blog
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
     const session = await getServerSession(authOptions);
 
     // Check if user is authenticated
@@ -268,10 +268,10 @@ export async function PUT(
 // DELETE /api/admin/blogs/[id] - Delete a blog
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
     const session = await getServerSession(authOptions);
 
     // Check if user is authenticated

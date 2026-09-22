@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import PropertyCard from '@/components/PropertyCard';
 import { useSearchParams, useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -32,6 +32,20 @@ interface PaginationData {
 }
 
 export default function PropertiesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[50vh] items-center justify-center text-sm text-muted-foreground">
+          Loading properties…
+        </div>
+      }
+    >
+      <PropertiesPageContent />
+    </Suspense>
+  );
+}
+
+function PropertiesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
