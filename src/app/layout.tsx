@@ -4,19 +4,20 @@ import { Playfair_Display, Manrope } from 'next/font/google';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { SessionProvider } from '@/providers/SessionProvider';
-import { Toaster } from "@/components/ui/sonner";
-import ClientAnimations from '@/components/ClientAnimations';
+import DeferredExtras from '@/components/DeferredExtras';
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-playfair',
   display: 'swap',
+  preload: false,
 });
 
 const manrope = Manrope({
   subsets: ['latin'],
   variable: '--font-manrope',
   display: 'swap',
+  preload: true,
 });
 
 export const metadata: Metadata = {
@@ -24,9 +25,9 @@ export const metadata: Metadata = {
   description:
     "Pakistan's trust-first property marketplace. Every listing verified — clear title, real ownership, genuine documents.",
   icons: {
-    icon: '/images/logo.jpeg',
-    apple: '/images/logo.jpeg',
-    shortcut: '/images/logo.jpeg',
+    icon: '/images/logo-nav.jpeg',
+    apple: '/images/logo-nav.jpeg',
+    shortcut: '/images/logo-nav.jpeg',
   },
 };
 
@@ -45,14 +46,13 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning className={`${playfair.variable} ${manrope.variable}`}>
       <body className={`${manrope.className} bg-background text-foreground antialiased`} suppressHydrationWarning>
         <SessionProvider>
-          <div className="flex flex-col min-h-screen">
+          <div className="flex min-h-screen flex-col">
             {!isAdminPath && <Header />}
             <main className="flex-grow">{children}</main>
             {!isAdminPath && <Footer />}
           </div>
         </SessionProvider>
-        <Toaster />
-        <ClientAnimations />
+        <DeferredExtras />
       </body>
     </html>
   );

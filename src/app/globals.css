@@ -102,6 +102,8 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-light: var(--primary-light);
+  --color-primary-dark: var(--primary-dark);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -474,7 +476,7 @@ select.modern-input option:focus {
 
 /* Gradient text */
 .gradient-text {
-  background: linear-gradient(to right, var(--secondary), var(--secondary-light));
+  background: linear-gradient(to right, var(--primary), var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -487,7 +489,7 @@ select.modern-input option:focus {
   position: absolute;
   left: 0;
   top: 0;
-  background: linear-gradient(to right, var(--secondary-dark), var(--secondary));
+  background: linear-gradient(to right, var(--primary-dark), var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -727,7 +729,7 @@ select.modern-input option:focus {
 }
 
 .gradient-text {
-  background: linear-gradient(to right, var(--secondary), var(--secondary-light));
+  background: linear-gradient(to right, var(--primary), var(--accent));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1094,7 +1096,7 @@ select.modern-input option:focus {
 
 /* Enhanced Gradient Text */
 .gradient-text {
-  background: linear-gradient(to right, var(--secondary), var(--secondary-light));
+  background: linear-gradient(to right, var(--primary), var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -1107,7 +1109,7 @@ select.modern-input option:focus {
   position: absolute;
   left: 0;
   top: 0;
-  background: linear-gradient(to right, var(--secondary-dark), var(--secondary));
+  background: linear-gradient(to right, var(--primary-dark), var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

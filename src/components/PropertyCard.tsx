@@ -59,7 +59,6 @@ export default function PropertyCard({ property }: PropertyCardProps) {
           src={imgSrc}
           alt={property.title}
           fill
-          unoptimized
           onError={handleImageError}
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

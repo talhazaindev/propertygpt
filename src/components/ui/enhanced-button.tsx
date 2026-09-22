@@ -31,12 +31,12 @@ export function EnhancedButton({
   const baseClasses = 'inline-flex items-center justify-center font-medium transition-all duration-300 ease-out relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed group';
 
   const variantClasses = {
-    primary: 'bg-gradient-to-r from-primary to-primary-dark text-white hover:from-primary-dark hover:to-primary shadow-lg hover:shadow-xl hover:shadow-primary/30 focus:ring-primary/50',
-    secondary: 'bg-gradient-to-r from-secondary to-secondary-dark text-white hover:from-secondary-dark hover:to-secondary shadow-lg hover:shadow-xl hover:shadow-secondary/30 focus:ring-secondary/50',
-    outline: 'border-2 border-primary text-primary bg-transparent hover:bg-primary hover:text-white focus:ring-primary/50',
+    primary: 'bg-gradient-to-r from-primary to-primary-dark text-primary-foreground hover:from-primary-dark hover:to-primary shadow-lg hover:shadow-xl hover:shadow-primary/30 focus:ring-primary/50',
+    secondary: 'bg-accent text-accent-foreground hover:opacity-90 shadow-lg hover:shadow-xl focus:ring-accent/50',
+    outline: 'border-2 border-primary text-primary bg-transparent hover:bg-primary hover:text-primary-foreground focus:ring-primary/50',
     ghost: 'text-primary hover:bg-primary/10 hover:text-primary-dark focus:ring-primary/50',
-    gradient: 'bg-gradient-to-r from-primary via-secondary to-primary bg-size-200 hover:bg-pos-100 text-white shadow-lg hover:shadow-xl focus:ring-primary/50',
-    glass: 'bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 focus:ring-white/50'
+    gradient: 'bg-gradient-to-r from-primary via-primary-light to-primary-dark bg-size-200 hover:bg-pos-100 text-primary-foreground shadow-lg hover:shadow-xl focus:ring-primary/50',
+    glass: 'bg-white/10 backdrop-blur-sm border border-white/20 text-foreground hover:bg-white/20 focus:ring-primary/50'
   };
 
   const sizeClasses = {

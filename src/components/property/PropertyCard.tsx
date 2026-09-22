@@ -50,9 +50,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
           src={imgSrc}
           alt={property.title}
           fill
-          unoptimized
           onError={handleImageError}
           className="object-cover"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         />
         {property.isVerified && (
           <div className="absolute left-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm">

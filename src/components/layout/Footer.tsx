@@ -22,11 +22,12 @@ const Footer = () => {
           <div className="lg:col-span-1">
             <Link href="/" className="inline-block">
               <Image
-                src="/images/logo.jpeg"
+                src="/images/logo-nav.jpeg"
                 alt="Manzil By AlWahabCo"
                 width={160}
                 height={56}
                 className="h-14 w-auto object-contain"
+                sizes="160px"
               />
             </Link>
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground">

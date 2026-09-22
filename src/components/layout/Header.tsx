@@ -12,7 +12,6 @@ import {
   FileText,
   HardHat,
   BookOpen,
-  Tag,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -28,12 +27,19 @@ const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
 
   const isAuthenticated = status === "authenticated";
-  const isLoading = status === "loading";
   const isHomePage = pathname === "/";
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", handleScroll);
+    let ticking = false;
+    const handleScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        setIsScrolled(window.scrollY > 10);
+        ticking = false;
+      });
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -54,17 +60,6 @@ const Header = () => {
   const navLinkClass =
     "text-sm font-medium text-muted-foreground transition-colors hover:text-foreground";
 
-  if (isLoading) {
-    return (
-      <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="h-10 w-36 animate-pulse rounded-md bg-muted" />
-          <div className="h-9 w-9 animate-pulse rounded-md bg-muted" />
-        </div>
-      </header>
-    );
-  }
-
   return (
     <header
       className={`sticky top-0 z-50 border-b transition-all duration-300 ${
@@ -76,12 +71,13 @@ const Header = () => {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex shrink-0 items-center" aria-label="Manzil By AlWahabCo — home">
           <Image
-            src="/images/logo.jpeg"
+            src="/images/logo-nav.jpeg"
             alt="Manzil By AlWahabCo"
             width={140}
             height={48}
             className="h-11 w-auto object-contain"
             priority
+            sizes="140px"
           />
         </Link>
 
@@ -106,9 +102,6 @@ const Header = () => {
               <Link href="/properties" className={navLinkClass}>
                 Properties
               </Link>
-              <Link href="/sell" className={navLinkClass}>
-                Sell
-              </Link>
               <Link href="/request-property" className={navLinkClass}>
                 Request Property
               </Link>
@@ -123,9 +116,12 @@ const Header = () => {
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
-          {!isAuthenticated ? (
+          {status === "loading" ? (
+            <div className="h-5 w-14 animate-pulse rounded bg-muted" aria-hidden />
+          ) : !isAuthenticated ? (
             <Link
               href="/login"
+              prefetch
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               Sign in
@@ -174,6 +170,12 @@ const Header = () => {
             </div>
           )}
           <Link
+            href="/sell"
+            className="inline-flex items-center rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+          >
+            Sell
+          </Link>
+          <Link
             href={isHomePage ? "#cta" : "/request-property"}
             className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
@@ -215,9 +217,6 @@ const Header = () => {
             <Link href="/properties" className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
               <Home className="h-4 w-4 text-primary" /> Properties
             </Link>
-            <Link href="/sell" className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
-              <Tag className="h-4 w-4 text-primary" /> Sell
-            </Link>
             <Link href="/request-property" className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
               <FileText className="h-4 w-4 text-primary" /> Request Property
             </Link>
@@ -228,9 +227,9 @@ const Header = () => {
               <BookOpen className="h-4 w-4 text-primary" /> Blog
             </Link>
             <div className="my-2 border-t border-border" />
-            {!isAuthenticated ? (
+            {status === "loading" ? null : !isAuthenticated ? (
               <>
-                <Link href="/login" className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
+                <Link href="/login" prefetch className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
                   <LogIn className="h-4 w-4" /> Sign in
                 </Link>
                 <Link href="/register" className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
@@ -248,8 +247,15 @@ const Header = () => {
               </>
             )}
             <Link
+              href="/sell"
+              className="mt-2 inline-flex items-center justify-center rounded-lg border border-primary px-4 py-2.5 text-sm font-medium text-primary"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Sell Your Property
+            </Link>
+            <Link
               href={isHomePage ? "#cta" : "/request-property"}
-              className="mt-2 inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground"
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground"
               onClick={() => setIsMenuOpen(false)}
             >
               Verify a Property

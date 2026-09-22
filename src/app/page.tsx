@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { unstable_cache } from "next/cache";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -20,26 +21,29 @@ import { prisma } from "@/lib/prisma";
 import PropertyCard from "@/components/PropertyCard";
 import { RequestVerificationCta } from "@/components/landing/RequestVerificationCta";
 
-async function getFeaturedProperties() {
-  try {
-    const properties = await prisma.property.findMany({
-      where: {
-        OR: [
-          { featured: true },
-          { status: { in: ["ACTIVE", "VERIFIED"] } },
-          { verifiedAt: { not: null } },
-        ],
-      },
-      include: { city: true },
-      orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
-      take: 3,
-    });
-    return properties;
-  } catch (error) {
-    console.error("Failed to load featured properties:", error);
-    return [];
-  }
-}
+const getFeaturedProperties = unstable_cache(
+  async () => {
+    try {
+      return await prisma.property.findMany({
+        where: {
+          OR: [
+            { featured: true },
+            { status: { in: ["ACTIVE", "VERIFIED"] } },
+            { verifiedAt: { not: null } },
+          ],
+        },
+        include: { city: true },
+        orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
+        take: 3,
+      });
+    } catch (error) {
+      console.error("Failed to load featured properties:", error);
+      return [];
+    }
+  },
+  ["featured-properties"],
+  { revalidate: 120 }
+);
 
 function formatPrice(price: number): string {
   if (price >= 10_000_000) {
@@ -192,12 +196,13 @@ export default async function Home() {
           <div className="relative mt-14 overflow-hidden rounded-2xl border border-border shadow-sm">
             <div className="relative aspect-[16/9] w-full sm:aspect-[21/9]">
               <Image
-                src="/images/hero-home.jpg"
+                src="/images/hero-home-web.jpg"
                 alt="A modern verified villa listed on Manzil in Pakistan"
                 fill
                 className="object-cover"
                 priority
                 sizes="(max-width: 1152px) 100vw, 1152px"
+                quality={75}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-foreground/40 via-transparent to-transparent" />
               <div className="absolute bottom-4 left-4 right-4 max-w-md rounded-xl border border-white/20 bg-background/95 p-4 shadow-lg backdrop-blur-sm sm:bottom-6 sm:left-6">
@@ -280,11 +285,13 @@ export default async function Home() {
           </div>
           <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-border shadow-sm lg:aspect-square">
             <Image
-              src="/images/verification.jpg"
+              src="/images/verification-web.jpg"
               alt="Manzil's legal team reviewing property documents with a client before a sale"
               fill
               className="object-cover"
               sizes="(max-width: 1024px) 100vw, 50vw"
+              quality={75}
+              loading="lazy"
             />
           </div>
         </div>
