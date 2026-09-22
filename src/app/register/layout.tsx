@@ -3,8 +3,8 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 
 export const metadata: Metadata = {
-  title: "Register - PropertyGPT",
-  description: "Create an account to discover and buy properties with PropertyGPT, Pakistan's trusted real estate platform.",
+  title: "Register - Manzil By AlWahabCo",
+  description: "Create an account to discover and buy properties with Manzil By AlWahabCo, Pakistan's trusted real estate platform.",
 };
 
 export default function RegisterLayout({

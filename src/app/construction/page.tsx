@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { ConstructionRequestForm } from "@/components/construction/ConstructionRequestForm";
 
 export const metadata: Metadata = {
-  title: "Hire Us To Construct | PropertyGPT",
+  title: "Hire Us To Construct | Manzil By AlWahabCo",
   description: "Submit a construction request for your dream property",
 };
 

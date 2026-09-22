@@ -44,7 +44,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
   };
   
   return (
-    <div className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition duration-300">
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition duration-300 hover:shadow-md">
       <div className="relative h-48 w-full">
         <Image
           src={imgSrc}
@@ -55,18 +55,19 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
           className="object-cover"
         />
         {property.isVerified && (
-          <div className="absolute top-2 right-2 bg-white p-1 rounded-full">
-            <BadgeCheck className="h-5 w-5 text-blue-600" />
+          <div className="absolute left-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm">
+            <BadgeCheck className="h-3.5 w-3.5" />
+            Title Verified
           </div>
         )}
-        <div className="absolute bottom-2 left-2 bg-primary text-white px-2 py-1 rounded text-sm">
+        <div className="absolute bottom-2 left-2 rounded bg-primary px-2 py-1 text-sm text-primary-foreground">
           {property.propertyType || property.type || "Property"}
         </div>
       </div>
       
       <div className="p-4">
         <Link href={`/properties/${property.id}`} className="block">
-          <h3 className="text-lg font-semibold text-gray-900 truncate">{property.title}</h3>
+          <h3 className="truncate font-serif text-lg font-semibold text-foreground">{property.title}</h3>
         </Link>
         
         <div className="mt-1 flex items-center text-gray-500">

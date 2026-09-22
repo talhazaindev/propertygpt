@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { City, getCities } from "@/lib/city-service";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -52,6 +52,7 @@ export function PropertyRequestForm() {
   const [cities, setCities] = useState<City[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Initialize form
   const form = useForm<FormValues>({
@@ -69,6 +70,14 @@ export function PropertyRequestForm() {
       additionalDetails: "",
     },
   });
+
+  // Prefill contact from landing CTA query params
+  useEffect(() => {
+    const email = searchParams.get("email");
+    const phone = searchParams.get("phone");
+    if (email) form.setValue("email", email);
+    if (phone) form.setValue("phone", phone);
+  }, [searchParams, form]);
 
   // Fetch cities for dropdown
   useEffect(() => {

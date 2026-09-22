@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --port 3000 --hostname 127.0.0.1",
     "dev:turbo": "next dev --turbopack --port 3000 --hostname 127.0.0.1",
-    "build": "next build",
+    "build": "prisma generate && next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",
     "prisma:seed": "ts-node prisma/seed.ts",

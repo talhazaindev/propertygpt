@@ -4,7 +4,7 @@ import { CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Request Submitted | PropertyGPT",
+  title: "Request Submitted | Manzil By AlWahabCo",
   description: "Your property request has been submitted successfully.",
 };
 
@@ -30,7 +30,7 @@ export default function RequestSubmitted() {
           </p>
           
           <p className="text-sm text-gray-500">
-            If you have any additional information or questions, please feel free to contact us at <a href="mailto:contact@propertygpt.com" className="font-medium text-blue-600 hover:underline">contact@propertygpt.com</a>
+            If you have any additional information or questions, please feel free to contact us at <a href="mailto:hello@manzil.pk" className="font-medium text-blue-600 hover:underline">hello@manzil.pk</a>
           </p>
         </div>
         

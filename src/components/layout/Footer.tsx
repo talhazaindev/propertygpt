@@ -1,233 +1,147 @@
 "use client";
 
 import Link from "next/link";
-import { Mail, Phone, MapPin, Home, Info, MessageCircle, Facebook, Instagram, Twitter, Linkedin } from "lucide-react";
+import Image from "next/image";
+import { Mail, Phone, MapPin } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
   const pathname = usePathname();
-  
-  // Don't render footer on admin pages
-  if (pathname?.startsWith('/admin')) {
+
+  if (pathname?.startsWith("/admin")) {
     return null;
   }
-  
+
+  const linkClass = "text-sm text-muted-foreground transition-colors hover:text-primary";
+
   return (
-    <footer className="pt-16 pb-8 relative bg-gradient-to-br from-primary-dark via-primary to-primary-dark text-white">
-      {/* Decorative pattern overlay */}
-      <div className="absolute inset-0 bg-[url('/images/pattern.png')] opacity-5 bg-repeat"></div>
-      
-      {/* Gold accent line */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-secondary-dark via-secondary to-secondary-light"></div>
-      
-      <div className="container mx-auto px-4 relative z-10">
-        {/* Footer top section - Get in touch */}
-        <div className="flex flex-col md:flex-row items-center justify-between p-6 mb-12 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
-          <div className="mb-6 md:mb-0">
-            <h3 className="text-2xl font-bold">Ready to Find Your Dream Property?</h3>
-            <p className="text-white/80 mt-2">Get in touch with our expert team today</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Link 
-              href="/contact" 
-              className="px-6 py-3 bg-secondary hover:bg-secondary-light text-white font-semibold rounded-full transition-all shadow-lg hover:shadow-xl hover:translate-y-[-2px]"
-            >
-              Contact Us
+    <footer className="border-t border-border bg-background">
+      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4">
+          <div className="lg:col-span-1">
+            <Link href="/" className="inline-block">
+              <Image
+                src="/images/logo.jpeg"
+                alt="Manzil By AlWahabCo"
+                width={160}
+                height={56}
+                className="h-14 w-auto object-contain"
+              />
             </Link>
-            <Link 
-              href="/properties" 
-              className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/30 text-white font-semibold rounded-full transition-all"
-            >
-              Browse Properties
-            </Link>
-          </div>
-        </div>
-        
-        {/* Footer main content */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
-          {/* Company Info */}
-          <div>
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center mr-3">
-                <span className="text-2xl font-bold text-white">P</span>
-              </div>
-              <div className="text-xl font-bold">
-                Property<span className="text-secondary">GPT</span>
-              </div>
-            </div>
-            <p className="text-white/70 mb-6 leading-relaxed">
-              Your trusted partner for secure and authentic real estate transactions
-              across Pakistan. We're committed to making your property journey seamless.
+            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+              Pakistan&apos;s trust-first property marketplace. Every listing verified, every buyer
+              protected.
             </p>
-            <div className="flex space-x-3">
-              <a href="#" className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-secondary hover:text-white transition-all duration-300">
-                <Facebook size={18} />
-              </a>
-              <a href="#" className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-secondary hover:text-white transition-all duration-300">
-                <Instagram size={18} />
-              </a>
-              <a href="#" className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-secondary hover:text-white transition-all duration-300">
-                <Twitter size={18} />
-              </a>
-              <a href="#" className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-secondary hover:text-white transition-all duration-300">
-                <Linkedin size={18} />
-              </a>
-            </div>
+            <ul className="mt-6 space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-primary" />
+                <a href="tel:+9242111000000" className="hover:text-primary">
+                  +92 42 111 000 000
+                </a>
+              </li>
+              <li className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-primary" />
+                <a href="mailto:hello@manzil.pk" className="hover:text-primary">
+                  hello@manzil.pk
+                </a>
+              </li>
+              <li className="flex items-start gap-2">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <span>Gulberg III, Lahore, Pakistan</span>
+              </li>
+            </ul>
           </div>
 
-          {/* Quick Links */}
           <div>
-            <h3 className="text-lg font-semibold mb-6 relative inline-block">
-              Quick Links
-              <span className="absolute left-0 bottom-[-8px] w-12 h-[3px] bg-secondary"></span>
-            </h3>
-            <ul className="space-y-3">
+            <h3 className="font-serif text-base font-semibold text-foreground">Company</h3>
+            <ul className="mt-4 space-y-2.5">
               <li>
-                <Link href="/" className="text-white/70 hover:text-secondary flex items-center transition-colors">
-                  <Home className="h-4 w-4 mr-2" />
-                  <span>Home</span>
-                </Link>
+                <a href={pathname === "/" ? "#promise" : "/#promise"} className={linkClass}>
+                  About AlWahabCo
+                </a>
               </li>
               <li>
-                <Link href="/properties" className="text-white/70 hover:text-secondary flex items-center transition-colors">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  <span>Properties</span>
-                </Link>
+                <a href={pathname === "/" ? "#verification" : "/#verification"} className={linkClass}>
+                  Our Verification Standard
+                </a>
               </li>
               <li>
-                <Link href="/about" className="text-white/70 hover:text-secondary flex items-center transition-colors">
-                  <Info className="h-4 w-4 mr-2" />
-                  <span>About Us</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="text-white/70 hover:text-secondary flex items-center transition-colors">
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  <span>Contact</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/blog" className="text-white/70 hover:text-secondary flex items-center transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                  </svg>
-                  <span>Blog</span>
+                <Link href="/blogs" className={linkClass}>
+                  Insights
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Cities */}
           <div>
-            <h3 className="text-lg font-semibold mb-6 relative inline-block">
-              Popular Cities
-              <span className="absolute left-0 bottom-[-8px] w-12 h-[3px] bg-secondary"></span>
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <Link href="/properties?cityId=karachi" className="text-white/70 hover:text-secondary transition-colors group">
-                <div className="flex items-center">
-                  <span className="w-2 h-2 bg-secondary/50 rounded-full mr-2 group-hover:scale-125 transition-transform"></span>
-                  Karachi
-                </div>
-              </Link>
-              <Link href="/properties?cityId=lahore" className="text-white/70 hover:text-secondary transition-colors group">
-                <div className="flex items-center">
-                  <span className="w-2 h-2 bg-secondary/50 rounded-full mr-2 group-hover:scale-125 transition-transform"></span>
-                  Lahore
-                </div>
-              </Link>
-              <Link href="/properties?cityId=islamabad" className="text-white/70 hover:text-secondary transition-colors group">
-                <div className="flex items-center">
-                  <span className="w-2 h-2 bg-secondary/50 rounded-full mr-2 group-hover:scale-125 transition-transform"></span>
-                  Islamabad
-                </div>
-              </Link>
-              <Link href="/properties?cityId=rawalpindi" className="text-white/70 hover:text-secondary transition-colors group">
-                <div className="flex items-center">
-                  <span className="w-2 h-2 bg-secondary/50 rounded-full mr-2 group-hover:scale-125 transition-transform"></span>
-                  Rawalpindi
-                </div>
-              </Link>
-              <Link href="/properties?cityId=faisalabad" className="text-white/70 hover:text-secondary transition-colors group">
-                <div className="flex items-center">
-                  <span className="w-2 h-2 bg-secondary/50 rounded-full mr-2 group-hover:scale-125 transition-transform"></span>
-                  Faisalabad
-                </div>
-              </Link>
-              <Link href="/properties?cityId=multan" className="text-white/70 hover:text-secondary transition-colors group">
-                <div className="flex items-center">
-                  <span className="w-2 h-2 bg-secondary/50 rounded-full mr-2 group-hover:scale-125 transition-transform"></span>
-                  Multan
-                </div>
-              </Link>
-              <Link href="/properties?cityId=peshawar" className="text-white/70 hover:text-secondary transition-colors group">
-                <div className="flex items-center">
-                  <span className="w-2 h-2 bg-secondary/50 rounded-full mr-2 group-hover:scale-125 transition-transform"></span>
-                  Peshawar
-                </div>
-              </Link>
-              <Link href="/properties?cityId=quetta" className="text-white/70 hover:text-secondary transition-colors group">
-                <div className="flex items-center">
-                  <span className="w-2 h-2 bg-secondary/50 rounded-full mr-2 group-hover:scale-125 transition-transform"></span>
-                  Quetta
-                </div>
-              </Link>
-            </div>
+            <h3 className="font-serif text-base font-semibold text-foreground">Buyers</h3>
+            <ul className="mt-4 space-y-2.5">
+              <li>
+                <Link href="/properties" className={linkClass}>
+                  Browse Listings
+                </Link>
+              </li>
+              <li>
+                <a href={pathname === "/" ? "#verification" : "/#verification"} className={linkClass}>
+                  How Verification Works
+                </a>
+              </li>
+              <li>
+                <Link href="/request-property" className={linkClass}>
+                  Request Verification
+                </Link>
+              </li>
+              <li>
+                <Link href="/sell" className={linkClass}>
+                  Sell Your Property
+                </Link>
+              </li>
+              <li>
+                <Link href="/construction" className={linkClass}>
+                  Hire Us To Construct
+                </Link>
+              </li>
+              <li>
+                <Link href="/blogs" className={linkClass}>
+                  Blog
+                </Link>
+              </li>
+            </ul>
           </div>
 
-          {/* Contact */}
           <div>
-            <h3 className="text-lg font-semibold mb-6 relative inline-block">
-              Contact Us
-              <span className="absolute left-0 bottom-[-8px] w-12 h-[3px] bg-secondary"></span>
-            </h3>
-            <address className="not-italic text-white/70 space-y-4">
-              <div className="flex items-start">
-                <MapPin className="h-5 w-5 mr-3 mt-0.5 text-secondary" />
-                <div>
-                  <p>Head Office: 123 Main Street</p>
-                  <p>Islamabad, Pakistan</p>
-                </div>
-              </div>
-              <div className="flex items-center">
-                <Mail className="h-5 w-5 mr-3 text-secondary" />
-                <a href="mailto:info@propertygpt.pk" className="hover:text-secondary transition-colors">info@propertygpt.pk</a>
-              </div>
-              <div className="flex items-center">
-                <Phone className="h-5 w-5 mr-3 text-secondary" />
-                <a href="tel:+923001234567" className="hover:text-secondary transition-colors">+92 300 1234567</a>
-              </div>
-            </address>
-
-            {/* Newsletter Signup */}
-            <div className="mt-6 bg-white/10 p-4 rounded-lg">
-              <h4 className="text-sm font-medium mb-2">Subscribe to our newsletter</h4>
-              <div className="flex">
-                <input 
-                  type="email" 
-                  placeholder="Your email" 
-                  className="flex-1 py-2 px-3 bg-white/10 border border-white/20 rounded-l-md text-white focus:outline-none focus:border-secondary"
-                />
-                <button className="bg-secondary hover:bg-secondary-light px-4 rounded-r-md transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </button>
-              </div>
-            </div>
+            <h3 className="font-serif text-base font-semibold text-foreground">Cities</h3>
+            <ul className="mt-4 space-y-2.5">
+              <li>
+                <Link href="/properties?city=lahore" className={linkClass}>
+                  Lahore
+                </Link>
+              </li>
+              <li>
+                <Link href="/properties?city=islamabad" className={linkClass}>
+                  Islamabad
+                </Link>
+              </li>
+              <li>
+                <Link href="/properties?city=karachi" className={linkClass}>
+                  Karachi
+                </Link>
+              </li>
+              <li>
+                <Link href="/properties?city=rawalpindi" className={linkClass}>
+                  Rawalpindi
+                </Link>
+              </li>
+            </ul>
           </div>
         </div>
 
-        {/* Footer bottom */}
-        <div className="mt-16 pt-8 border-t border-white/20 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-white/60 text-sm mb-4 md:mb-0">
-            &copy; {currentYear} PropertyGPT. All rights reserved.
-          </p>
-          <div className="flex space-x-6 text-white/60 text-sm">
-            <Link href="/terms" className="hover:text-secondary transition-colors">Terms & Conditions</Link>
-            <Link href="/privacy" className="hover:text-secondary transition-colors">Privacy Policy</Link>
-            <Link href="/sitemap" className="hover:text-secondary transition-colors">Sitemap</Link>
+        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 text-sm text-muted-foreground sm:flex-row">
+          <p>&copy; {currentYear} Manzil By AlWahabCo. All rights reserved.</p>
+          <div className="flex gap-6">
+            <span className="cursor-default">Privacy Policy</span>
+            <span className="cursor-default">Terms of Service</span>
           </div>
         </div>
       </div>
@@ -235,4 +149,4 @@ const Footer = () => {
   );
 };
 
-export default Footer; 
+export default Footer;

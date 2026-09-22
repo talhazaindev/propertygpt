@@ -107,7 +107,7 @@ export default function LoginPage() {
                 Welcome <span className="gradient-text">Back</span>
               </h1>
               <p className="text-gray-600">
-                Sign in to access your PropertyGPT account and manage your properties
+                Sign in to access your Manzil By AlWahabCo account and manage your properties
               </p>
             </div>
 
@@ -239,7 +239,7 @@ export default function LoginPage() {
                 <div className="w-full border-t border-gray-200"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">New to PropertyGPT?</span>
+                <span className="px-4 bg-white text-gray-500">New to Manzil By AlWahabCo?</span>
               </div>
             </div>
 

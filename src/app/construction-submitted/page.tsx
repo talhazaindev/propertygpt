@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Request Submitted | PropertyGPT",
+  title: "Request Submitted | Manzil By AlWahabCo",
   description: "Your construction request has been submitted successfully",
 };
 

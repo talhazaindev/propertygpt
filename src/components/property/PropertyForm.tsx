@@ -292,7 +292,7 @@ export default function PropertyForm({
           <div className="flex items-center mt-4 text-sm text-gray-500">
             <span className="flex items-center">
               <Home className="h-4 w-4 mr-1" />
-              <span>PropertyGPT</span>
+              <span>Manzil By AlWahabCo</span>
             </span>
             <ChevronsRight className="h-4 w-4 mx-1" />
             <span className="flex items-center">

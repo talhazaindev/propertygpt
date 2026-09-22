@@ -2,8 +2,8 @@ import { Metadata } from "next";
 import SellClient from "@/components/client/SellClient";
 
 export const metadata: Metadata = {
-  title: "Sell Your Property - PropertyGPT",
-  description: "List your property for sale on PropertyGPT, Pakistan's trusted real estate platform.",
+  title: "Sell Your Property - Manzil By AlWahabCo",
+  description: "List your property for sale on Manzil By AlWahabCo, Pakistan's trusted real estate platform.",
 };
 
 // Disable data fetching to avoid MongoDB errors

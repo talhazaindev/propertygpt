@@ -3,8 +3,8 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 
 export const metadata: Metadata = {
-  title: "Sell Property - PropertyGPT",
-  description: "List your property for sale on PropertyGPT, Pakistan's trusted real estate platform.",
+  title: "Sell Property - Manzil By AlWahabCo",
+  description: "List your property for sale on Manzil By AlWahabCo, Pakistan's trusted real estate platform.",
 };
 
 // Mark the layout as static to avoid MongoDB issues

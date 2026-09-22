@@ -61,7 +61,7 @@ export default function RegisterPage() {
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Create an Account</h1>
           <p className="mt-2 text-gray-600">
-            Join PropertyGPT to find your perfect property
+            Join Manzil By AlWahabCo to find your perfect property
           </p>
         </div>
 

@@ -177,7 +177,7 @@ export default function BlogDetailPage({ params }: { params: { slug: string } })
                 </div>
               )}
               <div className="ml-3">
-                <p className="font-medium text-gray-900">{blog.author?.name || "PropertyGPT Team"}</p>
+                <p className="font-medium text-gray-900">{blog.author?.name || "Manzil By AlWahabCo Team"}</p>
               </div>
             </div>
             
@@ -264,7 +264,7 @@ export default function BlogDetailPage({ params }: { params: { slug: string } })
               <div>
                 <h3 className="text-lg font-bold text-gray-900">{blog.author.name}</h3>
                 <p className="text-gray-600 mt-1">
-                  Property expert and content creator at PropertyGPT.
+                  Property expert and content creator at Manzil By AlWahabCo.
                 </p>
               </div>
             </div>

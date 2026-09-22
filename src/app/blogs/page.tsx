@@ -273,7 +273,7 @@ export default function BlogsPage() {
                         </div>
                       )}
                       <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-900">{blog.author?.name || "PropertyGPT Team"}</p>
+                        <p className="text-sm font-medium text-gray-900">{blog.author?.name || "Manzil By AlWahabCo Team"}</p>
                       </div>
                     </div>
                     
