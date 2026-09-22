@@ -1,0 +1,227 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  hashedPassword String?
+  image          String?
+  role           Role      @default(BUYER)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  phoneNumber    String?
+  properties     Property[]
+}
+
+enum Role {
+  ADMIN
+  BUYER
+  SELLER
+  AGENT
+}
+
+model City {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique
+  province  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relationships
+  teamMembers TeamMember[]
+  properties  Property[]
+}
+
+enum TeamRole {
+  SUPER_ADMIN
+  AREA_MANAGER
+  PROPERTY_VERIFIER
+  CONTENT_CREATOR
+  CUSTOMER_SUPPORT
+  INVENTORY_MANAGER
+}
+
+model TeamMember {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  email          String    @unique
+  hashedPassword String
+  phoneNumber    String?
+  role           TeamRole
+  isActive       Boolean   @default(true)
+  image          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  // Relationships
+  city           City?     @relation(fields: [cityId], references: [id])
+  cityId         String?   @db.ObjectId
+  
+  // Property verification relationship
+  verifiedProperties Property[] @relation("VerifiedBy")
+  
+  // Property posting relationship
+  postedProperties Property[] @relation("PostedBy")
+  
+  // Blogs relationship
+  blogs BlogPost[] @relation("AuthoredBy")
+
+  // Property requests assigned to this team member
+  assignedRequests PropertyRequest[]
+}
+
+enum PropertyType {
+  APARTMENT
+  HOUSE
+  VILLA
+  LAND
+  COMMERCIAL
+}
+
+enum PropertyStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  ACTIVE
+  SOLD
+}
+
+enum PropertyListingType {
+  SALE
+  RENTAL
+}
+
+model Property {
+  id          String         @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  price       Float
+  type        PropertyType
+  listingType PropertyListingType @default(SALE)
+  bedrooms    Int?
+  bathrooms   Int?
+  area        Float
+  address     String
+  status      PropertyStatus @default(PENDING)
+  featured    Boolean        @default(false)
+  images      String[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  
+  // Location data
+  cityId      String?        @db.ObjectId
+  city        City?          @relation(fields: [cityId], references: [id])
+  
+  // Owner relationship
+  ownerId     String         @db.ObjectId
+  owner       User           @relation(fields: [ownerId], references: [id])
+  
+  // Verification details
+  verifiedAt  DateTime?
+  verifiedBy  TeamMember?    @relation("VerifiedBy", fields: [verifierId], references: [id])
+  verifierId  String?        @db.ObjectId
+  
+  // Posting details
+  contactPhone String?
+  postedAt    DateTime?
+  postedBy    TeamMember?    @relation("PostedBy", fields: [postedById], references: [id])
+  postedById  String?        @db.ObjectId
+  
+  // Rejection reason if rejected
+  rejectionReason String?
+  
+  // Status history
+  statusHistory Json[]
+}
+
+model Sale {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  propertyId  String   @db.ObjectId
+  buyerId     String   @db.ObjectId
+  sellerId    String   @db.ObjectId
+  price       Float
+  commission  Float
+  saleDate    DateTime @default(now())
+  status      SaleStatus @default(COMPLETED)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Additional optional fields
+  agentId     String?  @db.ObjectId
+  notes       String?
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum BlogStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model BlogPost {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  slug        String     @unique
+  content     String
+  summary     String
+  coverImage  String
+  images      String[]
+  status      BlogStatus @default(DRAFT)
+  tags        String[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  publishedAt DateTime?
+  
+  // Author relationship
+  authorId    String     @db.ObjectId
+  author      TeamMember @relation("AuthoredBy", fields: [authorId], references: [id])
+}
+
+enum PropertyRequestStatus {
+  PENDING
+  REVIEWED
+  CONTACTED
+  COMPLETED
+  CANCELED
+}
+
+model PropertyRequest {
+  id               String               @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  email            String
+  phone            String
+  city             String
+  budget           Float
+  propertyType     String
+  bedrooms         Int?
+  bathrooms        Int?
+  area             Float?
+  additionalDetails String?
+  status           PropertyRequestStatus @default(PENDING)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  
+  // Admin notes
+  adminNotes       String?
+  assignedToId     String?              @db.ObjectId
+  assignedTo       TeamMember?          @relation(fields: [assignedToId], references: [id])
+}

@@ -1,0 +1,14 @@
+{
+  "name": "propertygpt-scripts",
+  "version": "1.0.0",
+  "description": "Utility scripts for PropertyGPT",
+  "type": "module",
+  "scripts": {
+    "fix-properties": "node fix-properties.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^16.6.1",
+    "mongodb": "^4.17.2"
+  }
+}
