@@ -4,13 +4,23 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 axios.defaults.withCredentials = true;
-import { ArrowLeft, Edit, Trash2, CheckCircle, XCircle, AlertCircle, UserCheck, Star, Camera, ArrowUpCircle } from "lucide-react";
+import { ArrowLeft, Trash2, CheckCircle, XCircle, AlertCircle, Star, Camera, ArrowUpCircle, FileText, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
+import { verificationDocumentTypeLabels, type VerificationDocument } from "@/schemas/property";
 
-// Default placeholder for property images
-const DEFAULT_PROPERTY_IMAGE = '/images/property-placeholder.jpg';
+function isImageDocument(url: string, fileName?: string): boolean {
+  const target = (fileName || url).toLowerCase();
+  return target.endsWith(".jpg") || target.endsWith(".jpeg") || target.endsWith(".png") || target.endsWith(".webp");
+}
+
+function getDocumentLabel(type: string): string {
+  return (
+    verificationDocumentTypeLabels[type as keyof typeof verificationDocumentTypeLabels] ||
+    type
+  );
+}
 
 // PropertyDetail component
 export default function PropertyDetail() {
@@ -399,9 +409,9 @@ export default function PropertyDetail() {
             {/* Images */}
             <div>
               <h2 className="text-lg font-semibold mb-4">Property Images</h2>
-              {property.images.length > 0 ? (
+              {property.images?.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3">
-                  {property.images.map((image, index) => (
+                  {property.images.map((image: string, index: number) => (
                     <div key={index} className="relative aspect-video rounded-md overflow-hidden">
                       <Image 
                         src={image} 
@@ -505,6 +515,57 @@ export default function PropertyDetail() {
                 )}
               </dl>
             </div>
+          </div>
+
+          {/* Verification Documents */}
+          <div className="p-6 border-t border-gray-200">
+            <h2 className="text-lg font-semibold mb-4">Verification Documents</h2>
+            {Array.isArray(property.verificationDocuments) && property.verificationDocuments.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {property.verificationDocuments.map((doc: VerificationDocument, index: number) => (
+                  <div
+                    key={`${doc.url}-${index}`}
+                    className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50"
+                  >
+                    {isImageDocument(doc.url, doc.fileName) ? (
+                      <div className="relative h-40 bg-white">
+                        <Image
+                          src={doc.url}
+                          alt={getDocumentLabel(doc.type)}
+                          fill
+                          className="object-contain p-2"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-40 flex flex-col items-center justify-center bg-white gap-2">
+                        <FileText className="h-10 w-10 text-gray-400" />
+                        <span className="text-xs text-gray-500">PDF Document</span>
+                      </div>
+                    )}
+                    <div className="p-3 border-t border-gray-200">
+                      <p className="text-sm font-medium text-gray-900">
+                        {getDocumentLabel(doc.type)}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate mt-0.5">{doc.fileName}</p>
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        View / Download
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-gray-100 rounded-lg p-8 text-center">
+                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">No verification documents uploaded</p>
+              </div>
+            )}
           </div>
           
           {/* Description */}

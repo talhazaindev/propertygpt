@@ -527,9 +527,9 @@ export default function PropertyManagement() {
       )}
       
       <Link
-        href={`/properties/${property.id}`}
+        href={`/admin/properties/${property.id}`}
         className="p-1.5 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
-        title="View Property"
+        title="View Property Details"
       >
         <Eye className="h-4 w-4" />
       </Link>

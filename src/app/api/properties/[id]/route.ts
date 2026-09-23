@@ -78,7 +78,8 @@ export async function GET(
             id: ownerDoc._id.toString(),
             name: ownerDoc.name,
             email: ownerDoc.email,
-            phone: ownerDoc.phoneNumber
+            phoneNumber: ownerDoc.phoneNumber || null,
+            phone: ownerDoc.phoneNumber || null,
           };
         }
       } catch (ownerError) {
@@ -94,13 +95,16 @@ export async function GET(
       description: property.description,
       price: property.price,
       type: property.type,
+      listingType: property.listingType || "SALE",
       bedrooms: property.bedrooms,
       bathrooms: property.bathrooms,
       area: property.area,
       address: property.address,
       status: property.status,
       featured: property.featured,
-      images: property.images,
+      contactPhone: property.contactPhone || null,
+      images: property.images || [],
+      verificationDocuments: property.verificationDocuments || [],
       city: city ? {
         id: city._id.toString(),
         name: city.name,

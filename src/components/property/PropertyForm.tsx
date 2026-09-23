@@ -3,12 +3,27 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { propertyClientSchema, PropertyFormValues, propertyTypes, propertyListingTypes } from "@/schemas/property";
+import {
+  propertyClientSchema,
+  PropertyFormValues,
+  propertyTypes,
+  propertyListingTypes,
+  verificationDocumentTypes,
+  verificationDocumentTypeLabels,
+  validateImageFiles,
+  validateVerificationDocument,
+  type VerificationDocumentType,
+} from "@/schemas/property";
 import { useRouter } from "next/navigation";
-import { Loader2, Upload, X, Camera, Home, Building, ChevronsRight } from "lucide-react";
+import { Loader2, Upload, X, Camera, Home, Building, ChevronsRight, FileText } from "lucide-react";
 import { City, getCities } from "@/lib/city-service";
-import { useSession } from "next-auth/react";
 import Image from "next/image";
+
+interface PendingVerificationDocument {
+  id: string;
+  type: VerificationDocumentType;
+  file: File;
+}
 
 interface PropertyFormProps {
   editMode?: boolean;
@@ -22,24 +37,24 @@ export default function PropertyForm({
   initialData 
 }: PropertyFormProps) {
   const router = useRouter();
-  const { data: session } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [cities, setCities] = useState<City[]>([]);
-  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [isImageLoading, setIsImageLoading] = useState(false);
-  const [imageLoadingProgress, setImageLoadingProgress] = useState(0);
+  const [verificationDocs, setVerificationDocs] = useState<PendingVerificationDocument[]>([]);
+  const [selectedDocType, setSelectedDocType] = useState<VerificationDocumentType | "">("");
+  const [selectedDocFile, setSelectedDocFile] = useState<File | null>(null);
+  const [docError, setDocError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
-    watch,
-    setValue
   } = useForm<PropertyFormValues>({
     resolver: zodResolver(propertyClientSchema),
     defaultValues: initialData || {
@@ -71,68 +86,68 @@ export default function PropertyForm({
     loadCities();
   }, []);
 
-  // Watch selected files for preview
-  const watchedImages = watch("images");
-  
+  // Build image previews from local File[] state
   useEffect(() => {
-    if (watchedImages && watchedImages.length > 0) {
-      setIsImageLoading(true);
-      setImageLoadingProgress(10);
-      const newPreviewUrls: string[] = [];
-      
-      try {
-        console.log("Images selected:", watchedImages.length);
-        
-        // Simulate loading progress - in a real app this would be tied to actual upload progress
-        const progressInterval = setInterval(() => {
-          setImageLoadingProgress(prev => {
-            if (prev >= 90) {
-              clearInterval(progressInterval);
-              return prev;
-            }
-            return prev + 10;
-          });
-        }, 100);
-        
-        // Log all files in the FileList for debugging
-        for (let i = 0; i < watchedImages.length; i++) {
-          const file = watchedImages[i];
-          console.log(`Image ${i + 1} details:`, {
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            lastModified: file.lastModified
-          });
-        }
-        
-        Array.from(watchedImages).forEach((file, index) => {
-          console.log(`Processing image ${index + 1}:`, file.name, file.type, file.size);
-          const url = URL.createObjectURL(file);
-          newPreviewUrls.push(url);
-        });
-        
-        setPreviewUrls(newPreviewUrls);
-        console.log(`Generated ${newPreviewUrls.length} preview URLs:`, newPreviewUrls);
-        
-        // Complete the loading
-        setTimeout(() => {
-          clearInterval(progressInterval);
-          setImageLoadingProgress(100);
-          setIsImageLoading(false);
-        }, 500);
-        
-        // Clean up URLs when component unmounts
-        return () => {
-          clearInterval(progressInterval);
-          newPreviewUrls.forEach(url => URL.revokeObjectURL(url));
-        };
-      } catch (error) {
-        console.error("Error processing selected images:", error);
-        setError(`There was a problem processing your images: ${error instanceof Error ? error.message : String(error)}`);
-        setIsImageLoading(false);
-      }
+    const urls = imageFiles.map((file) => URL.createObjectURL(file));
+    setPreviewUrls(urls);
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [imageFiles]);
+
+  const handleImagesSelected = (files: FileList | null) => {
+    setImageError(null);
+    if (!files || files.length === 0) return;
+
+    const nextFiles = [...imageFiles, ...Array.from(files)];
+    const validationError = validateImageFiles(nextFiles);
+    if (validationError) {
+      setImageError(validationError);
+      return;
     }
-  }, [watchedImages]);
+
+    setImageFiles(nextFiles);
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImageFiles((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      setImageError(validateImageFiles(next));
+      return next;
+    });
+  };
+
+  const clearPendingDocumentSelection = () => {
+    setSelectedDocType("");
+    setSelectedDocFile(null);
+    const input = document.getElementById("verification-document-file") as HTMLInputElement | null;
+    if (input) input.value = "";
+  };
+
+  const buildPendingDocument = (
+    type: VerificationDocumentType,
+    file: File
+  ): PendingVerificationDocument => ({
+    id: `${Date.now()}-${file.name}`,
+    type,
+    file,
+  });
+
+  const handleAddVerificationDocument = () => {
+    setDocError(null);
+
+    const validationError = validateVerificationDocument(selectedDocType, selectedDocFile);
+    if (validationError || !selectedDocType || !selectedDocFile) {
+      setDocError(validationError || "Please select a document type and file.");
+      return;
+    }
+
+    setVerificationDocs((prev) => [
+      ...prev,
+      buildPendingDocument(selectedDocType, selectedDocFile),
+    ]);
+    clearPendingDocumentSelection();
+  };
 
   // Handle form submission
   const onSubmit = async (data: PropertyFormValues) => {
@@ -140,50 +155,64 @@ export default function PropertyForm({
       setIsSubmitting(true);
       setError(null);
       setSuccess(null);
-      
-      console.log("Form submission started with data:", { 
-        ...data, 
-        images: data.images ? `${data.images.length} files` : "no images" 
-      });
+      setDocError(null);
+      setImageError(null);
+
+      const imageValidationError = validateImageFiles(imageFiles);
+      if (imageValidationError) {
+        setImageError(imageValidationError);
+        setError(imageValidationError);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Include any type+file still sitting in the picker (user may skip "Add Document")
+      let docsToUpload = [...verificationDocs];
+      if (selectedDocType || selectedDocFile) {
+        const pendingError = validateVerificationDocument(selectedDocType, selectedDocFile);
+        if (pendingError) {
+          setDocError(pendingError);
+          setError(pendingError);
+          setIsSubmitting(false);
+          return;
+        }
+        if (selectedDocType && selectedDocFile) {
+          docsToUpload = [
+            ...docsToUpload,
+            buildPendingDocument(selectedDocType, selectedDocFile),
+          ];
+        }
+      }
+
+      if (docsToUpload.length === 0) {
+        setDocError("At least one verification document is required.");
+        setError("Please upload at least one verification document.");
+        setIsSubmitting(false);
+        return;
+      }
       
       const formData = new FormData();
       
       // Add text and numeric fields
       Object.entries(data).forEach(([key, value]) => {
-        if (key !== "images" && value !== undefined) {
+        if (value !== undefined && value !== null) {
           formData.append(key, String(value));
-          console.log(`Added field ${key}:`, value);
         }
       });
       
-      // Add image files
-      if (data.images && data.images.length > 0) {
-        console.log(`Processing ${data.images.length} images for upload`);
-        try {
-          // Log the FileList object itself
-          console.log("FileList object:", data.images);
-          
-          // Directly append each file from the FileList
-          for (let i = 0; i < data.images.length; i++) {
-            const file = data.images[i];
-            formData.append("images", file);
-            console.log(`Added image ${i + 1} to FormData:`, file.name, file.size, file.type);
-          }
-          
-          // Verify formData contents
-          console.log("FormData entries:");
-          for (const pair of formData.entries()) {
-            console.log(pair[0], pair[1] instanceof File ? `File: ${(pair[1] as File).name}` : pair[1]);
-          }
-        } catch (error) {
-          console.error("Error processing images for FormData:", error);
-          setError(`Failed to process images: ${error instanceof Error ? error.message : String(error)}`);
-          setIsSubmitting(false);
-          return;
-        }
-      } else {
-        console.warn("No images provided for upload");
-      }
+      // Add image files from local state (avoids FileList/RHF issues)
+      imageFiles.forEach((file) => {
+        formData.append("images", file);
+      });
+
+      // Add verification documents
+      formData.append(
+        "verificationDocumentTypes",
+        JSON.stringify(docsToUpload.map((doc) => doc.type))
+      );
+      docsToUpload.forEach((doc) => {
+        formData.append("verificationDocuments", doc.file);
+      });
       
       // Set up progress tracking (simulated for now)
       const progressInterval = setInterval(() => {
@@ -203,7 +232,10 @@ export default function PropertyForm({
       
       const method = editMode ? "PATCH" : "POST";
       
-      console.log(`Submitting form to ${url} via ${method}`);
+      console.log(`Submitting form to ${url} via ${method}`, {
+        images: imageFiles.length,
+        verificationDocuments: docsToUpload.length,
+      });
       
       try {
         const response = await fetch(url, {
@@ -227,7 +259,7 @@ export default function PropertyForm({
               errorMessage = errorData.error;
             } else if (Array.isArray(errorData.error)) {
               // Handle array of errors
-              errorMessage = errorData.error.map((err: any) => 
+              errorMessage = errorData.error.map((err: { message?: string }) => 
                 err.message || JSON.stringify(err)
               ).join(", ");
             } else if (typeof errorData.error === 'object') {
@@ -252,7 +284,11 @@ export default function PropertyForm({
         // Reset form if not editing
         if (!editMode) {
           reset();
+          setImageFiles([]);
           setPreviewUrls([]);
+          setImageError(null);
+          setVerificationDocs([]);
+          clearPendingDocumentSelection();
         }
         
         // Redirect after successful submission
@@ -538,13 +574,15 @@ export default function PropertyForm({
           {/* Images Section */}
           <div>
             <h2 className="text-xl font-semibold pb-2 border-b border-gray-200 mb-4">
-              Property Images
-              <span className="text-gray-500 text-sm font-normal ml-2">(Optional)</span>
+              Property Images*
             </h2>
+            <p className="text-sm text-gray-500 mb-3">
+              At least one image is required.
+            </p>
             <div className="mt-2">
               <div 
                 className={`border-2 border-dashed rounded-lg p-6 text-center ${
-                  errors.images ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-primary hover:bg-gray-50'
+                  imageError ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-primary hover:bg-gray-50'
                 } transition-colors`}
               >
                 <input
@@ -553,23 +591,17 @@ export default function PropertyForm({
                   multiple
                   accept="image/jpeg,image/png,image/webp"
                   className="hidden"
-                  {...register("images")}
                   onChange={(e) => {
-                    if (e.target.files && e.target.files.length > 0) {
-                      try {
-                        setValue("images", e.target.files as any);
-                      } catch (error) {
-                        console.error("Error setting image files:", error);
-                        setError("Failed to process the selected images. Please try again with different images.");
-                      }
-                    }
+                    handleImagesSelected(e.target.files);
+                    // Allow selecting the same file again later
+                    e.target.value = "";
                   }}
-                  disabled={isImageLoading}
+                  disabled={isSubmitting}
                 />
-                <label htmlFor="images" className={`block ${isImageLoading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+                <label htmlFor="images" className={`block ${isSubmitting ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
                   <Camera className="mx-auto h-12 w-12 text-gray-400" />
                   <p className="mt-2 text-sm text-gray-600">
-                    {isImageLoading ? "Processing images..." : "Click to upload images of your property"}
+                    Click to upload images of your property
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     PNG, JPG, or WEBP (max 5MB per image)
@@ -577,34 +609,19 @@ export default function PropertyForm({
                 </label>
               </div>
               
-              {/* Image loading progress */}
-              {isImageLoading && (
-                <div className="mt-4">
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div 
-                      className="bg-blue-500 h-2.5 rounded-full transition-all duration-300"
-                      style={{ width: `${imageLoadingProgress}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1 text-right">
-                    Processing images: {imageLoadingProgress}%
-                  </p>
-                </div>
-              )}
-              
-              {errors.images && (
-                <p className="mt-1 text-sm text-red-600">{errors.images.message as string}</p>
+              {imageError && (
+                <p className="mt-1 text-sm text-red-600">{imageError}</p>
               )}
               
               {/* Image previews */}
-              {previewUrls.length > 0 && !isImageLoading && (
+              {previewUrls.length > 0 && (
                 <div className="mt-4">
                   <p className="text-sm font-medium text-gray-700 mb-2">
                     {previewUrls.length} {previewUrls.length === 1 ? 'image' : 'images'} selected:
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                     {previewUrls.map((url, index) => (
-                      <div key={index} className="relative rounded-lg overflow-hidden h-36 bg-gray-100">
+                      <div key={`${url}-${index}`} className="relative rounded-lg overflow-hidden h-36 bg-gray-100">
                         <Image
                           src={url}
                           alt={`Property image ${index + 1}`}
@@ -613,26 +630,7 @@ export default function PropertyForm({
                         />
                         <button
                           type="button"
-                          onClick={() => {
-                            try {
-                              // Remove this image from preview
-                              const newPreviewUrls = [...previewUrls];
-                              newPreviewUrls.splice(index, 1);
-                              setPreviewUrls(newPreviewUrls);
-                              
-                              // Also remove from the form data
-                              if (watchedImages) {
-                                const dt = new DataTransfer();
-                                Array.from(watchedImages)
-                                  .filter((_, i) => i !== index)
-                                  .forEach(file => dt.items.add(file));
-                                setValue("images", dt.files as any);
-                              }
-                            } catch (error) {
-                              console.error("Error removing image:", error);
-                              setError("There was a problem removing the image.");
-                            }
-                          }}
+                          onClick={() => handleRemoveImage(index)}
                           className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
                           disabled={isSubmitting}
                         >
@@ -644,6 +642,104 @@ export default function PropertyForm({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Verification Documents Section */}
+          <div>
+            <h2 className="text-xl font-semibold pb-2 border-b border-gray-200 mb-4">
+              Verification Documents*
+            </h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Select a document type and file, then click Add Document (or submit directly). PDF or JPEG, max 25MB.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+              <div>
+                <label htmlFor="verification-document-type" className="block text-sm font-medium text-gray-700 mb-1">
+                  Document Type*
+                </label>
+                <select
+                  id="verification-document-type"
+                  value={selectedDocType}
+                  onChange={(e) => setSelectedDocType(e.target.value as VerificationDocumentType | "")}
+                  className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary"
+                  disabled={isSubmitting}
+                >
+                  <option value="">Select document type</option>
+                  {verificationDocumentTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {verificationDocumentTypeLabels[type]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="verification-document-file" className="block text-sm font-medium text-gray-700 mb-1">
+                  Document File*
+                </label>
+                <input
+                  id="verification-document-file"
+                  type="file"
+                  accept="application/pdf,image/jpeg,.pdf,.jpg,.jpeg"
+                  className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-white hover:file:opacity-90"
+                  onChange={(e) => {
+                    setDocError(null);
+                    setSelectedDocFile(e.target.files?.[0] ?? null);
+                  }}
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-gray-500 mt-1">PDF or JPEG only (max 25MB)</p>
+              </div>
+
+              <div className="md:col-span-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleAddVerificationDocument}
+                  className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2"
+                  disabled={isSubmitting}
+                >
+                  <Upload className="h-4 w-4" />
+                  Add Document
+                </button>
+              </div>
+            </div>
+
+            {docError && (
+              <p className="mt-2 text-sm text-red-600">{docError}</p>
+            )}
+
+            {verificationDocs.length > 0 && (
+              <ul className="mt-4 space-y-2">
+                {verificationDocs.map((doc) => (
+                  <li
+                    key={doc.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900">
+                          {verificationDocumentTypeLabels[doc.type]}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">{doc.file.name}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setVerificationDocs((prev) => prev.filter((item) => item.id !== doc.id))
+                      }
+                      className="text-red-500 hover:text-red-700 p-1"
+                      disabled={isSubmitting}
+                      aria-label="Remove document"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           
           {/* Submission Section */}

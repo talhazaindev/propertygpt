@@ -119,6 +119,7 @@ model Property {
   status      PropertyStatus @default(PENDING)
   featured    Boolean        @default(false)
   images      String[]
+  verificationDocuments Json[] @default([])
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   

@@ -6,8 +6,27 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { ObjectId } from "mongodb";
 import { prisma } from "@/lib/prisma";
-import { propertySchema, propertyUpdateSchema } from "@/schemas/property";
+import {
+  propertySchema,
+  verificationDocumentTypes,
+  ACCEPTED_DOCUMENT_TYPES,
+  MAX_DOCUMENT_FILE_SIZE,
+  isAcceptedDocumentFile,
+  type VerificationDocumentType,
+} from "@/schemas/property";
 import { z } from "zod";
+
+const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+];
+const MAX_IMAGE_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+function isVerificationDocumentType(value: string): value is VerificationDocumentType {
+  return (verificationDocumentTypes as readonly string[]).includes(value);
+}
 
 // GET all properties or filter properties
 export async function GET(req: NextRequest) {
@@ -138,83 +157,192 @@ export async function POST(req: NextRequest) {
     const description = formData.get("description") as string;
     const price = parseFloat(formData.get("price") as string);
     const type = formData.get("type") as string;
+    const listingType = (formData.get("listingType") as string) || "SALE";
     const bedrooms = formData.get("bedrooms") ? parseInt(formData.get("bedrooms") as string) : undefined;
     const bathrooms = formData.get("bathrooms") ? parseInt(formData.get("bathrooms") as string) : undefined;
     const area = parseFloat(formData.get("area") as string);
     const address = formData.get("address") as string;
     const cityId = formData.get("cityId") as string;
-    const images = formData.getAll("images");
+    const images = formData.getAll("images").filter((item): item is File => item instanceof File && item.size > 0);
+    const verificationDocumentFiles = formData
+      .getAll("verificationDocuments")
+      .filter((item): item is File => item instanceof File && item.size > 0);
+
+    let documentTypes: string[] = [];
+    const rawDocumentTypes = formData.get("verificationDocumentTypes");
+    if (typeof rawDocumentTypes === "string" && rawDocumentTypes.trim()) {
+      try {
+        const parsed = JSON.parse(rawDocumentTypes);
+        if (Array.isArray(parsed)) {
+          documentTypes = parsed.map(String);
+        }
+      } catch {
+        return NextResponse.json(
+          { error: "Invalid verification document types payload" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (images.length === 0) {
+      return NextResponse.json(
+        { error: "At least one property image is required" },
+        { status: 400 }
+      );
+    }
+
+    if (verificationDocumentFiles.length === 0) {
+      return NextResponse.json(
+        { error: "At least one verification document is required" },
+        { status: 400 }
+      );
+    }
+
+    if (verificationDocumentFiles.length !== documentTypes.length) {
+      return NextResponse.json(
+        { error: "Each verification document must include a document type" },
+        { status: 400 }
+      );
+    }
+
+    for (const image of images) {
+      if (!ACCEPTED_IMAGE_TYPES.includes(image.type)) {
+        return NextResponse.json(
+          { error: "Only JPEG, PNG, and WEBP images are allowed" },
+          { status: 400 }
+        );
+      }
+      if (image.size > MAX_IMAGE_FILE_SIZE) {
+        return NextResponse.json(
+          { error: "Image size exceeds the 5MB limit" },
+          { status: 400 }
+        );
+      }
+    }
+
+    for (let i = 0; i < verificationDocumentFiles.length; i++) {
+      const file = verificationDocumentFiles[i];
+      const docType = documentTypes[i];
+
+      if (!isVerificationDocumentType(docType)) {
+        return NextResponse.json(
+          { error: `Invalid verification document type: ${docType}` },
+          { status: 400 }
+        );
+      }
+      if (!isAcceptedDocumentFile(file)) {
+        const name = file.name.toLowerCase();
+        const mimeOk = ACCEPTED_DOCUMENT_TYPES.includes(file.type);
+        const extensionOk =
+          name.endsWith(".pdf") || name.endsWith(".jpg") || name.endsWith(".jpeg");
+        if (!mimeOk && !extensionOk) {
+          return NextResponse.json(
+            { error: "Verification documents must be PDF or JPEG" },
+            { status: 400 }
+          );
+        }
+        if (file.size > MAX_DOCUMENT_FILE_SIZE) {
+          return NextResponse.json(
+            { error: "Document size exceeds the 25MB limit" },
+            { status: 400 }
+          );
+        }
+        return NextResponse.json(
+          { error: "Invalid verification document" },
+          { status: 400 }
+        );
+      }
+    }
     
-    // 3. Validate data - IMPORTANT: Made validation more permissive for images
-    // This allows form submission even with image upload issues for debugging
+    // 3. Validate text/numeric fields
     const validatedData = {
       title,
       description,
       price,
       type,
+      listingType,
       bedrooms,
       bathrooms,
       area,
       address,
       cityId,
-      // Skip image validation by providing a dummy value that meets schema requirements
-      images: undefined
+      imageUrls: images.map((_, index) => `placeholder-${index}`),
+      verificationDocuments: verificationDocumentFiles.map((file, index) => ({
+        type: documentTypes[index] as VerificationDocumentType,
+        url: `placeholder-${index}`,
+        fileName: file.name,
+      })),
     };
 
     try {
-      // Modify validation to be more lenient with images
-      // We'll still validate all other fields
       propertySchema.parse(validatedData);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        // Filter out image-related errors
-        const nonImageErrors = error.errors.filter(err => !err.path.includes('images'));
-        if (nonImageErrors.length > 0) {
-          return NextResponse.json({ error: nonImageErrors }, { status: 400 });
-        }
-      } else {
-        return NextResponse.json({ error: "Invalid data" }, { status: 400 });
+        return NextResponse.json({ error: error.errors }, { status: 400 });
       }
+      return NextResponse.json({ error: "Invalid data" }, { status: 400 });
     }
 
     // 4. Process images - save uploaded files to public/images/properties
     const imageUrls: string[] = [];
-    if (images && images.length > 0) {
-      try {
-        console.log(`Saving ${images.length} uploaded images to public/images/properties`);
-        const uploadDir = path.join(process.cwd(), 'public', 'images', 'properties');
-        await fs.mkdir(uploadDir, { recursive: true });
-        for (let index = 0; index < images.length; index++) {
-          const file = images[index] as Blob & { name?: string; type?: string };
-          // Convert Blob/File to buffer
-          const arrayBuffer = await file.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
-          // Derive file extension
-          let ext = '.jpg';
-          if (file.name) {
-            ext = path.extname(file.name) || ext;
-          } else if (file.type) {
-            const parts = file.type.split('/');
-            if (parts.length === 2) ext = `.${parts[1]}`;
-          }
-          const filename = `${Date.now()}-${index}${ext}`;
-          const filePath = path.join(uploadDir, filename);
-          await fs.writeFile(filePath, buffer);
-          imageUrls.push(`/images/properties/${filename}`);
-          console.log(`Saved uploaded image ${index + 1} as ${filename}`);
+    try {
+      console.log(`Saving ${images.length} uploaded images to public/images/properties`);
+      const uploadDir = path.join(process.cwd(), 'public', 'images', 'properties');
+      await fs.mkdir(uploadDir, { recursive: true });
+      for (let index = 0; index < images.length; index++) {
+        const file = images[index];
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        let ext = '.jpg';
+        if (file.name) {
+          ext = path.extname(file.name) || ext;
+        } else if (file.type) {
+          const parts = file.type.split('/');
+          if (parts.length === 2) ext = `.${parts[1]}`;
         }
-      } catch (error) {
-        console.error('Error saving uploaded images:', error);
-        // Use local placeholder image instead of external service
-        imageUrls.push('/images/property-placeholder.jpg');
+        const filename = `${Date.now()}-${index}${ext}`;
+        const filePath = path.join(uploadDir, filename);
+        await fs.writeFile(filePath, buffer);
+        imageUrls.push(`/images/properties/${filename}`);
+        console.log(`Saved uploaded image ${index + 1} as ${filename}`);
       }
-    } else {
-      // No images provided, use local placeholder image
-      console.log('No images provided, using local placeholder image');
-      imageUrls.push('/images/property-placeholder.jpg');
+    } catch (error) {
+      console.error('Error saving uploaded images:', error);
+      return NextResponse.json({ error: "Failed to save property images" }, { status: 500 });
     }
 
-    // 5. BYPASSING PRISMA: Use direct MongoDB client to avoid requiring replica set
+    // 5. Process verification documents
+    const verificationDocuments: Array<{
+      type: VerificationDocumentType;
+      url: string;
+      fileName: string;
+      uploadedAt: Date;
+    }> = [];
+    try {
+      const docsDir = path.join(process.cwd(), 'public', 'documents', 'properties');
+      await fs.mkdir(docsDir, { recursive: true });
+      for (let index = 0; index < verificationDocumentFiles.length; index++) {
+        const file = verificationDocumentFiles[index];
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        let ext = path.extname(file.name || '') || (file.type === 'application/pdf' ? '.pdf' : '.jpg');
+        const safeType = documentTypes[index].toLowerCase().replace(/_/g, '-');
+        const filename = `${Date.now()}-${safeType}-${index}${ext}`;
+        const filePath = path.join(docsDir, filename);
+        await fs.writeFile(filePath, buffer);
+        verificationDocuments.push({
+          type: documentTypes[index] as VerificationDocumentType,
+          url: `/documents/properties/${filename}`,
+          fileName: file.name || filename,
+          uploadedAt: new Date(),
+        });
+      }
+    } catch (error) {
+      console.error('Error saving verification documents:', error);
+      return NextResponse.json({ error: "Failed to save verification documents" }, { status: 500 });
+    }
+
+    // 6. BYPASSING PRISMA: Use direct MongoDB client to avoid requiring replica set
     console.log("Using direct MongoDB client to create property");
     
     // Connect to MongoDB directly
@@ -223,11 +351,12 @@ export async function POST(req: NextRequest) {
     
     // Create property document
     const now = new Date();
-    const propertyData: any = {
+    const propertyData: Record<string, unknown> = {
       title,
       description,
       price,
       type,
+      listingType,
       bedrooms,
       bathrooms,
       area,
@@ -235,6 +364,7 @@ export async function POST(req: NextRequest) {
       status: "PENDING",
       featured: false,
       images: imageUrls,
+      verificationDocuments,
       createdAt: now,
       updatedAt: now,
       ownerId: new ObjectId(session.user.id),

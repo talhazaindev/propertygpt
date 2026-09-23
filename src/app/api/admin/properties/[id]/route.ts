@@ -115,6 +115,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     
     // Ensure these required fields exist
     if (!propertyData.images) propertyData.images = [];
+    if (!propertyData.verificationDocuments) propertyData.verificationDocuments = [];
     if (!propertyData.city) propertyData.city = null;
     if (!propertyData.verifiedBy) propertyData.verifiedBy = null;
     if (!propertyData.rejectionReason) propertyData.rejectionReason = null;
@@ -210,12 +211,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       console.log("Found any team member:", teamMember ? teamMember.email : "No");
     }
 
+    // verifierId is optional — allow status updates without a team member
+    // (admin panel often authenticates via x-admin-auth without a TeamMember session)
     if (!teamMember && ['VERIFIED', 'ACTIVE', 'REJECTED'].includes(status)) {
-      console.log("Team member required but not found");
-      return NextResponse.json(
-        { error: "Team member not found" },
-        { status: 404 }
-      );
+      console.warn("No team member found; proceeding without verifierId");
     }
     
     console.log("Updating property with status:", status);
@@ -251,14 +250,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const objectId = new ObjectId(propertyId);
       console.log("ObjectId created successfully:", objectId.toString());
       
-      // Update property using MongoDB directly
-      const result = await propertiesCollection.findOneAndUpdate(
+      // MongoDB driver v6+ returns the document directly (or null), not { value }
+      const property = await propertiesCollection.findOneAndUpdate(
         { _id: objectId },
         { $set: updateData },
         { returnDocument: 'after' }
       );
       
-      if (!result || !result.value) {
+      if (!property) {
         console.error("Property not found with ID:", propertyId);
         return NextResponse.json(
           { error: "Property not found" },
@@ -266,10 +265,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         );
       }
       
-      console.log("Property updated successfully with status:", result.value.status);
+      console.log("Property updated successfully with status:", property.status);
       
-      // Format the response
-      const property = result.value;
       const response = {
         id: property._id.toString(),
         title: property.title,
@@ -356,22 +353,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       
       const objectId = new ObjectId(propertyId);
       
-      // Update property using MongoDB directly
-      const result = await propertiesCollection.findOneAndUpdate(
+      // MongoDB driver v6+ returns the document directly (or null), not { value }
+      const property = await propertiesCollection.findOneAndUpdate(
         { _id: objectId },
         { $set: propertyData },
         { returnDocument: 'after' }
       );
       
-      if (!result || !result.value) {
+      if (!property) {
         return NextResponse.json(
           { error: "Property not found" },
           { status: 404 }
         );
       }
       
-      // Format the response
-      const property = result.value;
       const response = {
         id: property._id.toString(),
         ...property,

@@ -187,31 +187,39 @@ export default function PropertyDetailPage() {
               Contact for more details about this property.
             </p>
             
-            {property.contactPhone || (property.owner && property.owner.phoneNumber) ? (
-              <div className="space-y-4">
-                <div className="flex items-center">
-                  <div className="bg-primary-light p-2 rounded-full mr-3">
-                    <Phone className="h-5 w-5 text-primary" />
+            {(() => {
+              const contactNumber =
+                property.contactPhone ||
+                property.owner?.phoneNumber ||
+                property.owner?.phone ||
+                null;
+
+              return contactNumber ? (
+                <div className="space-y-4">
+                  <div className="flex items-center">
+                    <div className="bg-primary-light p-2 rounded-full mr-3">
+                      <Phone className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Phone</div>
+                      <div className="font-medium">{contactNumber}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Phone</div>
-                    <div className="font-medium">{property.contactPhone || property.owner.phoneNumber}</div>
-                  </div>
+                  <a
+                    href={`tel:${contactNumber}`}
+                    className="block w-full bg-primary text-white text-center py-3 px-4 rounded-md hover:bg-primary-dark transition-colors"
+                  >
+                    Call Now
+                  </a>
                 </div>
-                <a 
-                  href={`tel:${property.contactPhone || property.owner.phoneNumber}`}
-                  className="block w-full bg-primary text-white text-center py-3 px-4 rounded-md hover:bg-primary-dark transition-colors"
-                >
-                  Call Now
-                </a>
-              </div>
-            ) : (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-                <p className="text-yellow-700 text-sm">
-                  Contact information will be available soon. Please check back later.
-                </p>
-              </div>
-            )}
+              ) : (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                  <p className="text-yellow-700 text-sm">
+                    Contact information will be available soon. Please check back later.
+                  </p>
+                </div>
+              );
+            })()}
             
             {property.owner && (
               <div className="mt-6 pt-6 border-t border-gray-200">

@@ -12,129 +12,169 @@ export const propertyStatusOptions = [
 
 export const propertyListingTypes = ["SALE", "RENTAL"] as const;
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+export const verificationDocumentTypes = [
+  "CNIC",
+  "POWER_OF_ATTORNEY",
+  "REGISTRY",
+  "FRD",
+] as const;
+
+export const verificationDocumentTypeLabels: Record<
+  (typeof verificationDocumentTypes)[number],
+  string
+> = {
+  CNIC: "CNIC",
+  POWER_OF_ATTORNEY: "Power of Attorney",
+  REGISTRY: "Registry",
+  FRD: "FRD",
+};
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB for property images
+export const MAX_DOCUMENT_FILE_SIZE = 25 * 1024 * 1024; // 25MB for verification documents
 const ACCEPTED_IMAGE_TYPES = [
-  "image/jpeg", 
-  "image/jpg", 
-  "image/png", 
-  "image/webp"
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
 ];
 
-// Type guard for FileList for safer type checking
-function isFileList(value: unknown): value is FileList {
-  return value !== null && 
-    typeof value === 'object' && 
-    'length' in value && 
-    typeof (value as FileList).item === 'function';
+export const ACCEPTED_DOCUMENT_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/jpg",
+];
+
+export function isAcceptedImageFile(file: File): boolean {
+  return ACCEPTED_IMAGE_TYPES.includes(file.type) && file.size <= MAX_FILE_SIZE;
 }
 
-// Client-side only schema with FileList validation
+export function isAcceptedDocumentFile(file: File): boolean {
+  const mimeOk = ACCEPTED_DOCUMENT_TYPES.includes(file.type);
+  const name = file.name.toLowerCase();
+  const extensionOk =
+    name.endsWith(".pdf") || name.endsWith(".jpg") || name.endsWith(".jpeg");
+  return (mimeOk || extensionOk) && file.size <= MAX_DOCUMENT_FILE_SIZE;
+}
+
+export function validateImageFiles(files: File[]): string | null {
+  if (files.length === 0) {
+    return "At least one property image is required";
+  }
+  if (files.some((file) => file.size > MAX_FILE_SIZE)) {
+    return "Image size exceeds the 5MB limit";
+  }
+  if (files.some((file) => !ACCEPTED_IMAGE_TYPES.includes(file.type))) {
+    return "Only JPEG, PNG, and WEBP formats are allowed";
+  }
+  return null;
+}
+
+export function validateVerificationDocument(
+  type: string | "",
+  file: File | null
+): string | null {
+  if (!type) {
+    return "Please select a document type.";
+  }
+  if (!file) {
+    return "Please select a PDF or JPEG file.";
+  }
+  const name = file.name.toLowerCase();
+  const mimeOk = ACCEPTED_DOCUMENT_TYPES.includes(file.type);
+  const extensionOk =
+    name.endsWith(".pdf") || name.endsWith(".jpg") || name.endsWith(".jpeg");
+  if (!mimeOk && !extensionOk) {
+    return "Only PDF and JPEG files are allowed.";
+  }
+  if (file.size > MAX_DOCUMENT_FILE_SIZE) {
+    return "Document size exceeds the 25MB limit.";
+  }
+  return null;
+}
+
+// Client-side only schema (images handled separately as File[] state)
 export const propertyClientSchema = z.object({
-  title: z.string().min(10, "Title must be at least 10 characters").max(100, "Title cannot exceed 100 characters"),
-  description: z.string()
+  title: z
+    .string()
+    .min(10, "Title must be at least 10 characters")
+    .max(100, "Title cannot exceed 100 characters"),
+  description: z
+    .string()
     .min(50, "Description must be at least 50 characters")
     .max(2000, "Description cannot exceed 2000 characters"),
-  price: z.number({
-    required_error: "Price is required",
-    invalid_type_error: "Price must be a number",
-  }).positive("Price must be greater than 0"),
+  price: z
+    .number({
+      required_error: "Price is required",
+      invalid_type_error: "Price must be a number",
+    })
+    .positive("Price must be greater than 0"),
   type: z.enum(propertyTypes, {
     required_error: "Property type is required",
   }),
   listingType: z.enum(propertyListingTypes).default("SALE"),
   bedrooms: z.number().int().positive().optional(),
   bathrooms: z.number().int().positive().optional(),
-  area: z.number({
-    required_error: "Area is required",
-    invalid_type_error: "Area must be a number",
-  }).positive("Area must be greater than 0"),
-  address: z.string().min(5, "Address must be at least 5 characters").max(200, "Address cannot exceed 200 characters"),
+  area: z
+    .number({
+      required_error: "Area is required",
+      invalid_type_error: "Area must be a number",
+    })
+    .positive("Area must be greater than 0"),
+  address: z
+    .string()
+    .min(5, "Address must be at least 5 characters")
+    .max(200, "Address cannot exceed 200 characters"),
   cityId: z.string({
     required_error: "City is required",
   }),
-  images: z.custom<FileList>((value) => {
-    // In a non-browser environment, skip validation
-    if (typeof window === 'undefined') return true;
-    
-    // Make images completely optional - return true regardless
-    return true;
-  })
-    .optional() // Make images optional to help with form submission
-    .refine(
-      (files) => {
-        // Skip validation in non-browser environment
-        if (typeof window === 'undefined') return true;
-        
-        // Skip validation if no files
-        if (!files) return true;
-        
-        if (!isFileList(files)) return true; // Changed to true to prevent validation errors
-        
-        let validSize = true;
-        try {
-          Array.from(files).forEach(file => {
-            if (file.size > MAX_FILE_SIZE) {
-              validSize = false;
-            }
-          });
-        } catch (e) {
-          console.error("Error validating file size:", e);
-        }
-        return validSize;
-      }, 
-      "Image size exceeds the 5MB limit"
-    )
-    .refine(
-      (files) => {
-        // Skip validation in non-browser environment
-        if (typeof window === 'undefined') return true;
-        
-        // Skip validation if no files
-        if (!files) return true;
-        
-        if (!isFileList(files)) return true; // Changed to true to prevent validation errors
-        
-        let validType = true;
-        try {
-          Array.from(files).forEach(file => {
-            if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-              validType = false;
-            }
-          });
-        } catch (e) {
-          console.error("Error validating file type:", e);
-        }
-        return validType;
-      },
-      "Only JPEG, PNG, and WEBP formats are allowed"
-    )
 });
 
 // SSR-safe schema without FileList validation
 export const propertySchema = z.object({
-  title: z.string().min(10, "Title must be at least 10 characters").max(100, "Title cannot exceed 100 characters"),
-  description: z.string()
+  title: z
+    .string()
+    .min(10, "Title must be at least 10 characters")
+    .max(100, "Title cannot exceed 100 characters"),
+  description: z
+    .string()
     .min(50, "Description must be at least 50 characters")
     .max(2000, "Description cannot exceed 2000 characters"),
-  price: z.number({
-    required_error: "Price is required",
-    invalid_type_error: "Price must be a number",
-  }).positive("Price must be greater than 0"),
+  price: z
+    .number({
+      required_error: "Price is required",
+      invalid_type_error: "Price must be a number",
+    })
+    .positive("Price must be greater than 0"),
   type: z.enum(propertyTypes, {
     required_error: "Property type is required",
   }),
   listingType: z.enum(propertyListingTypes).default("SALE"),
   bedrooms: z.number().int().positive().optional(),
   bathrooms: z.number().int().positive().optional(),
-  area: z.number({
-    required_error: "Area is required",
-    invalid_type_error: "Area must be a number",
-  }).positive("Area must be greater than 0"),
-  address: z.string().min(5, "Address must be at least 5 characters").max(200, "Address cannot exceed 200 characters"),
+  area: z
+    .number({
+      required_error: "Area is required",
+      invalid_type_error: "Area must be a number",
+    })
+    .positive("Area must be greater than 0"),
+  address: z
+    .string()
+    .min(5, "Address must be at least 5 characters")
+    .max(200, "Address cannot exceed 200 characters"),
   cityId: z.string({
     required_error: "City is required",
   }),
-  imageUrls: z.array(z.string()).optional(),
+  imageUrls: z.array(z.string()).min(1, "At least one property image is required"),
+  verificationDocuments: z
+    .array(
+      z.object({
+        type: z.enum(verificationDocumentTypes),
+        url: z.string().min(1),
+        fileName: z.string().min(1),
+        uploadedAt: z.union([z.string(), z.date()]).optional(),
+      })
+    )
+    .min(1, "At least one verification document is required"),
 });
 
 // Search schema for property filtering
@@ -149,13 +189,19 @@ export const propertySearchSchema = z.object({
   bathrooms: z.coerce.number().optional(),
 });
 
-export const propertyUpdateSchema = propertyClientSchema.partial({
-  images: true
-});
+export const propertyUpdateSchema = propertyClientSchema.partial();
 
 export type PropertyFormValues = z.infer<typeof propertyClientSchema>;
 export type PropertySearchValues = z.infer<typeof propertySearchSchema>;
 export type PropertyUpdateValues = z.infer<typeof propertyUpdateSchema>;
+export type VerificationDocumentType = (typeof verificationDocumentTypes)[number];
+
+export type VerificationDocument = {
+  type: VerificationDocumentType;
+  url: string;
+  fileName: string;
+  uploadedAt?: string | Date;
+};
 
 export const propertyApiResponseSchema = z.object({
   id: z.string(),
@@ -174,27 +220,46 @@ export const propertyApiResponseSchema = z.object({
     province: z.string(),
   }),
   images: z.array(z.string()),
+  verificationDocuments: z
+    .array(
+      z.object({
+        type: z.enum(verificationDocumentTypes),
+        url: z.string(),
+        fileName: z.string(),
+        uploadedAt: z.union([z.string(), z.date()]).optional(),
+      })
+    )
+    .optional()
+    .default([]),
   createdAt: z.string(),
   updatedAt: z.string(),
   status: z.string(),
   userId: z.string(),
   featured: z.boolean().optional(),
-  tracking: z.object({
-    status: z.string(),
-    pendingReason: z.string().optional().nullable(),
-    verificationDate: z.string().optional().nullable(),
-    statusHistory: z.array(z.object({
+  tracking: z
+    .object({
       status: z.string(),
-      date: z.string(),
-      note: z.string().optional().nullable(),
-    })).optional(),
-  }).optional(),
-  user: z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string(),
-    image: z.string().optional().nullable(),
-  }).optional(),
+      pendingReason: z.string().optional().nullable(),
+      verificationDate: z.string().optional().nullable(),
+      statusHistory: z
+        .array(
+          z.object({
+            status: z.string(),
+            date: z.string(),
+            note: z.string().optional().nullable(),
+          })
+        )
+        .optional(),
+    })
+    .optional(),
+  user: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      email: z.string(),
+      image: z.string().optional().nullable(),
+    })
+    .optional(),
 });
 
-export type PropertyApiResponse = z.infer<typeof propertyApiResponseSchema>; 
+export type PropertyApiResponse = z.infer<typeof propertyApiResponseSchema>;
