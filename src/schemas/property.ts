@@ -29,8 +29,8 @@ export const verificationDocumentTypeLabels: Record<
   FRD: "FRD",
 };
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB for property images
-export const MAX_DOCUMENT_FILE_SIZE = 25 * 1024 * 1024; // 25MB for verification documents
+const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB for property images (Vercel/UploadThing safe)
+export const MAX_DOCUMENT_FILE_SIZE = 16 * 1024 * 1024; // 16MB for verification documents
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
   "image/jpg",
@@ -61,7 +61,7 @@ export function validateImageFiles(files: File[]): string | null {
     return "At least one property image is required";
   }
   if (files.some((file) => file.size > MAX_FILE_SIZE)) {
-    return "Image size exceeds the 5MB limit";
+    return "Image size exceeds the 4MB limit";
   }
   if (files.some((file) => !ACCEPTED_IMAGE_TYPES.includes(file.type))) {
     return "Only JPEG, PNG, and WEBP formats are allowed";
@@ -87,7 +87,7 @@ export function validateVerificationDocument(
     return "Only PDF and JPEG files are allowed.";
   }
   if (file.size > MAX_DOCUMENT_FILE_SIZE) {
-    return "Document size exceeds the 25MB limit.";
+    return "Document size exceeds the 16MB limit.";
   }
   return null;
 }

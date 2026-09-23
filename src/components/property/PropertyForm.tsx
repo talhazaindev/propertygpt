@@ -17,7 +17,52 @@ import {
 import { useRouter } from "next/navigation";
 import { Loader2, Upload, X, Camera, Home, Building, ChevronsRight, FileText } from "lucide-react";
 import { City, getCities } from "@/lib/city-service";
+import { uploadFiles } from "@/lib/uploadthing";
 import Image from "next/image";
+
+function uploadedFileUrl(file: { ufsUrl?: string; url?: string }): string {
+  return file.ufsUrl || file.url || "";
+}
+
+async function parseApiError(response: Response): Promise<string> {
+  if (response.status === 413) {
+    return "Upload too large for the server. Use smaller files (images ≤4MB, documents ≤16MB).";
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    try {
+      const errorData = await response.json();
+      if (errorData?.error) {
+        if (typeof errorData.error === "string") return errorData.error;
+        if (Array.isArray(errorData.error)) {
+          return errorData.error
+            .map((err: { message?: string }) => err.message || JSON.stringify(err))
+            .join(", ");
+        }
+        if (typeof errorData.error === "object") {
+          return Object.values(errorData.error).map(String).join(", ");
+        }
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  try {
+    const text = await response.text();
+    if (text) {
+      if (text.startsWith("Request Entity") || text.includes("FUNCTION_PAYLOAD_TOO_LARGE")) {
+        return "Upload too large for the server. Use smaller files, or ensure UploadThing is configured.";
+      }
+      return text.slice(0, 300);
+    }
+  } catch {
+    // fall through
+  }
+
+  return "Failed to submit property";
+}
 
 interface PendingVerificationDocument {
   id: string;
@@ -191,88 +236,104 @@ export default function PropertyForm({
         return;
       }
       
-      const formData = new FormData();
-      
-      // Add text and numeric fields
-      Object.entries(data).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          formData.append(key, String(value));
+      // Upload files directly to UploadThing (bypasses Vercel 4.5MB body limit)
+      setUploadProgress(10);
+      let imageUrls: string[] = [];
+      let uploadedDocs: Array<{
+        type: VerificationDocumentType;
+        url: string;
+        fileName: string;
+      }> = [];
+
+      try {
+        const imageResults = await uploadFiles("propertyImages", {
+          files: imageFiles,
+          onUploadProgress: ({ totalProgress }) => {
+            setUploadProgress(Math.min(50, Math.round(totalProgress * 0.5)));
+          },
+        });
+        imageUrls = imageResults
+          .map((file) => uploadedFileUrl(file))
+          .filter(Boolean);
+
+        if (imageUrls.length === 0) {
+          throw new Error("Image upload failed. Please try again.");
         }
-      });
-      
-      // Add image files from local state (avoids FileList/RHF issues)
-      imageFiles.forEach((file) => {
-        formData.append("images", file);
+
+        setUploadProgress(55);
+
+        const docResults = await uploadFiles("verificationDocuments", {
+          files: docsToUpload.map((doc) => doc.file),
+          onUploadProgress: ({ totalProgress }) => {
+            setUploadProgress(55 + Math.min(35, Math.round(totalProgress * 0.35)));
+          },
+        });
+
+        uploadedDocs = docsToUpload.map((doc, index) => {
+          const uploaded = docResults[index];
+          const url = uploaded ? uploadedFileUrl(uploaded) : "";
+          if (!url) {
+            throw new Error(`Failed to upload document: ${doc.file.name}`);
+          }
+          return {
+            type: doc.type,
+            url,
+            fileName: doc.file.name,
+          };
+        });
+      } catch (uploadError) {
+        console.error("UploadThing error:", uploadError);
+        const message =
+          uploadError instanceof Error
+            ? uploadError.message
+            : "File upload failed";
+        if (
+          message.toLowerCase().includes("unauthorized") ||
+          message.toLowerCase().includes("token") ||
+          message.toLowerCase().includes("uploadthing")
+        ) {
+          throw new Error(
+            "File upload is not configured. Set UPLOADTHING_TOKEN in your environment (UploadThing dashboard)."
+          );
+        }
+        throw new Error(message);
+      }
+
+      setUploadProgress(92);
+
+      const url =
+        editMode && propertyId
+          ? `/api/properties/${propertyId}`
+          : "/api/properties";
+      const method = editMode ? "PATCH" : "POST";
+
+      const payload = {
+        ...data,
+        imageUrls,
+        verificationDocuments: uploadedDocs,
+      };
+
+      console.log(`Submitting form to ${url} via ${method}`, {
+        images: imageUrls.length,
+        verificationDocuments: uploadedDocs.length,
       });
 
-      // Add verification documents
-      formData.append(
-        "verificationDocumentTypes",
-        JSON.stringify(docsToUpload.map((doc) => doc.type))
-      );
-      docsToUpload.forEach((doc) => {
-        formData.append("verificationDocuments", doc.file);
-      });
-      
-      // Set up progress tracking (simulated for now)
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 95) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 5;
-        });
-      }, 200);
-      
-      // Submit property data
-      const url = editMode && propertyId 
-        ? `/api/properties/${propertyId}` 
-        : "/api/properties";
-      
-      const method = editMode ? "PATCH" : "POST";
-      
-      console.log(`Submitting form to ${url} via ${method}`, {
-        images: imageFiles.length,
-        verificationDocuments: docsToUpload.length,
-      });
-      
       try {
         const response = await fetch(url, {
           method,
-          body: formData,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         });
-        
-        clearInterval(progressInterval);
+
         setUploadProgress(100);
-        
         console.log("Server response status:", response.status);
-        
+
         if (!response.ok) {
-          const errorData = await response.json();
-          console.error("Server returned error:", errorData);
-          
-          // Enhanced error handling
-          let errorMessage = "Failed to submit property";
-          if (errorData && errorData.error) {
-            if (typeof errorData.error === 'string') {
-              errorMessage = errorData.error;
-            } else if (Array.isArray(errorData.error)) {
-              // Handle array of errors
-              errorMessage = errorData.error.map((err: { message?: string }) => 
-                err.message || JSON.stringify(err)
-              ).join(", ");
-            } else if (typeof errorData.error === 'object') {
-              // Handle object error
-              errorMessage = Object.values(errorData.error)
-                .map(val => String(val))
-                .join(", ");
-            }
-          }
-          
-          throw new Error(errorMessage);
+          throw new Error(await parseApiError(response));
         }
-        
+
         const result = await response.json();
         console.log("Submission successful:", result);
         
@@ -604,7 +665,7 @@ export default function PropertyForm({
                     Click to upload images of your property
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    PNG, JPG, or WEBP (max 5MB per image)
+                    PNG, JPG, or WEBP (max 4MB per image)
                   </p>
                 </label>
               </div>
@@ -650,7 +711,7 @@ export default function PropertyForm({
               Verification Documents*
             </h2>
             <p className="text-sm text-gray-500 mb-4">
-              Select a document type and file, then click Add Document (or submit directly). PDF or JPEG, max 25MB.
+              Select a document type and file, then click Add Document (or submit directly). PDF or JPEG, max 16MB.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
@@ -689,7 +750,7 @@ export default function PropertyForm({
                   }}
                   disabled={isSubmitting}
                 />
-                <p className="text-xs text-gray-500 mt-1">PDF or JPEG only (max 25MB)</p>
+                <p className="text-xs text-gray-500 mt-1">PDF or JPEG only (max 16MB)</p>
               </div>
 
               <div className="md:col-span-2 flex justify-end">
