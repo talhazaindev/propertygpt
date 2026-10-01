@@ -20,6 +20,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import PropertyCard from "@/components/PropertyCard";
 import { RequestVerificationCta } from "@/components/landing/RequestVerificationCta";
+import { AuthoritySeal } from "@/components/landing/AuthoritySeal";
 import { BlogCard } from "@/components/blog/BlogCard";
 
 const getFeaturedProperties = unstable_cache(
@@ -471,6 +472,36 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* Authority — group seal / AlWahabCo */}
+      <AuthoritySeal />
+
+      {/* Guarantees */}
+      <section className="border-y border-border bg-primary text-primary-foreground">
+        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="font-serif text-3xl font-semibold sm:text-4xl">
+              Guarantees that put the risk on us
+            </h2>
+            <p className="mt-4 text-primary-foreground/80">
+              Trust is easy to promise and hard to prove. These are the commitments we are willing
+              to be held to.
+            </p>
+          </div>
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {guarantees.map((g) => (
+              <div
+                key={g.title}
+                className="rounded-2xl border border-primary-foreground/15 bg-primary-foreground/5 p-6"
+              >
+                <g.icon className="h-6 w-6 text-accent" />
+                <h3 className="mt-4 font-serif text-lg font-semibold">{g.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-primary-foreground/75">{g.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Blogs */}
       <section id="blogs" className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
@@ -529,33 +560,6 @@ export default async function Home() {
             </Link>
           </div>
         )}
-      </section>
-
-      {/* Guarantees */}
-      <section className="border-y border-border bg-primary text-primary-foreground">
-        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="font-serif text-3xl font-semibold sm:text-4xl">
-              Guarantees that put the risk on us
-            </h2>
-            <p className="mt-4 text-primary-foreground/80">
-              Trust is easy to promise and hard to prove. These are the commitments we are willing
-              to be held to.
-            </p>
-          </div>
-          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {guarantees.map((g) => (
-              <div
-                key={g.title}
-                className="rounded-2xl border border-primary-foreground/15 bg-primary-foreground/5 p-6"
-              >
-                <g.icon className="h-6 w-6 text-accent" />
-                <h3 className="mt-4 font-serif text-lg font-semibold">{g.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-primary-foreground/75">{g.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
       </section>
 
       {/* Reviews */}

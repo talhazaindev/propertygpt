@@ -58,7 +58,7 @@ const Footer = () => {
             <h3 className="font-serif text-base font-semibold text-foreground">Company</h3>
             <ul className="mt-4 space-y-2.5">
               <li>
-                <a href={pathname === "/" ? "#promise" : "/#promise"} className={linkClass}>
+                <a href={pathname === "/" ? "#authority" : "/#authority"} className={linkClass}>
                   About AlWahabCo
                 </a>
               </li>
