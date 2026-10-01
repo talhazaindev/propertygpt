@@ -55,7 +55,13 @@ export async function GET(request: NextRequest) {
 
     // Build Prisma filter
     const filter: any = {};
-    if (status) filter.status = status;
+    if (status) {
+      if (status.includes(",")) {
+        filter.status = { in: status.split(",").map((s) => s.trim()).filter(Boolean) };
+      } else {
+        filter.status = status;
+      }
+    }
     if (type) filter.type = type;
     if (listingType) filter.listingType = listingType;
     if (searchTerm) {
@@ -172,7 +178,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
     
-    if (!status || !["PENDING", "VERIFIED", "REJECTED", "ACTIVE", "SOLD"].includes(status)) {
+    if (!status || !["PENDING", "VERIFIED", "REJECTED", "ACTIVE", "HIDDEN", "SOLD"].includes(status)) {
       return NextResponse.json(
         { error: "Valid status is required" },
         { status: 400 }
@@ -197,7 +203,7 @@ export async function PATCH(request: NextRequest) {
     }
     
     // If no team member found from session, try to find any superadmin as fallback
-    if (!teamMember && ['VERIFIED', 'ACTIVE', 'REJECTED'].includes(status)) {
+    if (!teamMember && ['VERIFIED', 'ACTIVE', 'HIDDEN', 'REJECTED'].includes(status)) {
       console.log("No team member from session, searching for a superadmin...");
       teamMember = await prisma.teamMember.findFirst({
         where: { 
@@ -211,7 +217,7 @@ export async function PATCH(request: NextRequest) {
     console.log("Team member found:", teamMember ? "Yes" : "No");
     
     // Extra fallback - use any active team member
-    if (!teamMember && ['VERIFIED', 'ACTIVE', 'REJECTED'].includes(status)) {
+    if (!teamMember && ['VERIFIED', 'ACTIVE', 'HIDDEN', 'REJECTED'].includes(status)) {
       console.log("No superadmin found, searching for any active team member...");
       teamMember = await prisma.teamMember.findFirst({
         where: { isActive: true }
@@ -220,7 +226,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // verifierId is optional — allow status updates without a team member
-    if (!teamMember && ['VERIFIED', 'ACTIVE', 'REJECTED'].includes(status)) {
+    if (!teamMember && ['VERIFIED', 'ACTIVE', 'HIDDEN', 'REJECTED'].includes(status)) {
       console.warn("No team member found; proceeding without verifierId");
     }
     

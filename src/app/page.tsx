@@ -20,6 +20,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import PropertyCard from "@/components/PropertyCard";
 import { RequestVerificationCta } from "@/components/landing/RequestVerificationCta";
+import { BlogCard } from "@/components/blog/BlogCard";
 
 const getFeaturedProperties = unstable_cache(
   async () => {
@@ -45,6 +46,28 @@ const getFeaturedProperties = unstable_cache(
   { revalidate: 120 }
 );
 
+const getLatestBlogs = unstable_cache(
+  async () => {
+    try {
+      return await prisma.blogPost.findMany({
+        where: { status: "PUBLISHED" },
+        include: {
+          author: {
+            select: { id: true, name: true, image: true },
+          },
+        },
+        orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+        take: 3,
+      });
+    } catch (error) {
+      console.error("Failed to load latest blogs:", error);
+      return [];
+    }
+  },
+  ["latest-blogs"],
+  { revalidate: 120 }
+);
+
 function formatPrice(price: number): string {
   if (price >= 10_000_000) {
     return `PKR ${(price / 10_000_000).toFixed(2)} Cr`;
@@ -56,7 +79,10 @@ function formatPrice(price: number): string {
 }
 
 export default async function Home() {
-  const featured = await getFeaturedProperties();
+  const [featured, latestBlogs] = await Promise.all([
+    getFeaturedProperties(),
+    getLatestBlogs(),
+  ]);
 
   const partners = [
     "Land Records Authority",
@@ -408,10 +434,10 @@ export default async function Home() {
               More ways we help
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Beyond verified buying — sell, build, and stay informed with Manzil.
+              Beyond verified buying — sell and build with the same trust standard.
             </p>
           </div>
-          <div className="mt-10 grid gap-4 sm:grid-cols-3">
+          <div className="mt-10 grid gap-4 sm:grid-cols-2">
             {[
               {
                 href: "/sell",
@@ -424,12 +450,6 @@ export default async function Home() {
                 title: "Hire us to construct",
                 body: "From plot to finished home — guided by the same trust standard.",
                 icon: HardHat,
-              },
-              {
-                href: "/blogs",
-                title: "Insights & guides",
-                body: "Practical advice on titles, societies, and buying safely in Pakistan.",
-                icon: BookOpen,
               },
             ].map((item) => (
               <Link
@@ -449,6 +469,66 @@ export default async function Home() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* Blogs */}
+      <section id="blogs" className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-sm font-medium uppercase tracking-wider text-primary">
+              Insights & guides
+            </p>
+            <h2 className="mt-2 font-serif text-3xl font-semibold text-foreground sm:text-4xl">
+              From the Manzil blog
+            </h2>
+            <p className="mt-3 text-muted-foreground">
+              Practical advice on titles, societies, verification, and buying safely in Pakistan.
+            </p>
+          </div>
+          <Link
+            href="/blogs"
+            className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+          >
+            View all articles
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        {latestBlogs.length > 0 ? (
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {latestBlogs.map((blog) => (
+              <BlogCard
+                key={blog.id}
+                blog={{
+                  id: blog.id,
+                  title: blog.title,
+                  slug: blog.slug,
+                  summary: blog.summary,
+                  coverImage: blog.coverImage,
+                  tags: blog.tags,
+                  publishedAt: blog.publishedAt,
+                  createdAt: blog.createdAt,
+                  author: blog.author,
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-10 rounded-2xl border border-dashed border-border bg-muted/40 px-6 py-16 text-center">
+            <BookOpen className="mx-auto h-10 w-10 text-primary/40" />
+            <p className="mt-4 font-serif text-xl text-foreground">Articles coming soon</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              We&apos;re preparing guides on verification, society transfers, and safe buying.
+            </p>
+            <Link
+              href="/blogs"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground"
+            >
+              Visit the blog
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        )}
       </section>
 
       {/* Guarantees */}

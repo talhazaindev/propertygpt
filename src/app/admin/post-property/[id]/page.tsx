@@ -12,6 +12,8 @@ import {
   XCircle,
   X,
   Camera,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import Link from "next/link";
 import { propertyTypes, propertyListingTypes } from "@/schemas/property";
@@ -64,8 +66,11 @@ export default function PostPropertyDetailPage() {
   const [newImages, setNewImages] = useState<File[]>([]);
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isAlreadyPosted =
+    property?.status === "ACTIVE" || property?.status === "HIDDEN";
 
   const updateField = <K extends keyof PropertyFormState>(
     key: K,
@@ -191,10 +196,14 @@ export default function PostPropertyDetailPage() {
     try {
       setIsUploading(true);
       const baseUrl = window.location.origin;
+      const nextStatus =
+        property.status === "ACTIVE" || property.status === "HIDDEN"
+          ? property.status
+          : "ACTIVE";
 
       const formData = new FormData();
       formData.append("id", propertyId);
-      formData.append("status", "ACTIVE");
+      formData.append("status", nextStatus);
       formData.append("contactPhone", phoneNumber.trim());
       formData.append("title", form.title.trim());
       formData.append("description", form.description.trim());
@@ -230,7 +239,11 @@ export default function PostPropertyDetailPage() {
         },
       });
 
-      toast.success("Property posted successfully!");
+      toast.success(
+        isAlreadyPosted
+          ? "Listing updated successfully!"
+          : "Property posted successfully!"
+      );
       router.push("/admin/post-property");
     } catch (error: any) {
       console.error("Error posting property:", error);
@@ -241,6 +254,36 @@ export default function PostPropertyDetailPage() {
       }
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleToggleVisibility = async () => {
+    if (!property) return;
+    const nextStatus = property.status === "HIDDEN" ? "ACTIVE" : "HIDDEN";
+
+    try {
+      setIsTogglingVisibility(true);
+      await axios.patch(
+        `/api/admin/properties/${propertyId}`,
+        { status: nextStatus },
+        {
+          headers: {
+            "x-admin-auth": "true",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      toast.success(
+        nextStatus === "HIDDEN"
+          ? "Property hidden from listings"
+          : "Property is now visible in listings"
+      );
+      fetchProperty();
+    } catch (error: any) {
+      console.error("Error toggling visibility:", error);
+      toast.error(error.response?.data?.error || "Failed to update visibility");
+    } finally {
+      setIsTogglingVisibility(false);
     }
   };
 
@@ -291,21 +334,51 @@ export default function PostPropertyDetailPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                Post Property
+                {isAlreadyPosted ? "Edit Posted Property" : "Post Property"}
               </h2>
               <p className="mt-1 text-sm text-gray-500">
-                Review and edit any details before posting to the main site
+                {isAlreadyPosted
+                  ? "Update listing details, images, and contact info"
+                  : "Review and edit any details before posting to the main site"}
               </p>
             </div>
-            <span
-              className={`px-3 py-1 rounded-full text-xs font-medium ${
-                property.status === "VERIFIED"
-                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100"
-                  : "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100"
-              }`}
-            >
-              {property.status}
-            </span>
+            <div className="flex items-center gap-2">
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  property.status === "VERIFIED"
+                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100"
+                    : property.status === "HIDDEN"
+                      ? "bg-gray-200 text-gray-700"
+                      : "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100"
+                }`}
+              >
+                {property.status === "ACTIVE"
+                  ? "Live"
+                  : property.status === "HIDDEN"
+                    ? "Hidden"
+                    : property.status}
+              </span>
+              {isAlreadyPosted && (
+                <button
+                  type="button"
+                  onClick={handleToggleVisibility}
+                  disabled={isTogglingVisibility}
+                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {property.status === "HIDDEN" ? (
+                    <>
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      Unhide
+                    </>
+                  ) : (
+                    <>
+                      <EyeOff className="h-3.5 w-3.5 mr-1.5" />
+                      Hide
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -626,7 +699,7 @@ export default function PostPropertyDetailPage() {
               ) : (
                 <>
                   <CheckCircle className="h-4 w-4 mr-2 inline-block" />
-                  Post Property
+                  {isAlreadyPosted ? "Save Changes" : "Post Property"}
                 </>
               )}
             </button>

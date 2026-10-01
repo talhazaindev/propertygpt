@@ -7,6 +7,7 @@ export const propertyStatusOptions = [
   "VERIFIED",
   "REJECTED",
   "ACTIVE",
+  "HIDDEN",
   "SOLD"
 ] as const;
 

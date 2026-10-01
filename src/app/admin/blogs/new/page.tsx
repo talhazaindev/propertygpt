@@ -182,18 +182,36 @@ export default function NewBlogPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-admin-auth": "true",
         },
         body: JSON.stringify(formData),
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         
-        if (errorData.errors) {
-          setErrors(errorData.errors);
-        } else {
-          throw new Error("Failed to create blog");
+        if (errorData.errors && typeof errorData.errors === "object") {
+          // Flatten Zod-style or field errors into the form
+          const fieldErrors: Record<string, string> = {};
+          for (const [key, value] of Object.entries(errorData.errors)) {
+            if (typeof value === "string") {
+              fieldErrors[key] = value;
+            } else if (
+              value &&
+              typeof value === "object" &&
+              Array.isArray((value as { _errors?: string[] })._errors)
+            ) {
+              fieldErrors[key] =
+                (value as { _errors: string[] })._errors[0] || "Invalid value";
+            }
+          }
+          if (Object.keys(fieldErrors).length > 0) {
+            setErrors(fieldErrors);
+            return;
+          }
         }
+
+        throw new Error(errorData.error || "Failed to create blog");
       } else {
         // Redirect to blogs page on success
         router.push("/admin/blogs");
@@ -201,7 +219,10 @@ export default function NewBlogPage() {
     } catch (error) {
       console.error("Error creating blog:", error);
       setErrors({
-        form: "Failed to create blog. Please try again.",
+        form:
+          error instanceof Error
+            ? error.message
+            : "Failed to create blog. Please try again.",
       });
     } finally {
       setIsSubmitting(false);

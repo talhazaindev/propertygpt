@@ -25,7 +25,7 @@ interface Property {
   bedrooms?: number;
   bathrooms?: number;
   area: number;
-  status: "PENDING" | "VERIFIED" | "REJECTED" | "ACTIVE" | "SOLD";
+  status: "PENDING" | "VERIFIED" | "REJECTED" | "ACTIVE" | "HIDDEN" | "SOLD";
   featured: boolean;
   createdAt: string;
   owner: {
@@ -202,6 +202,8 @@ const StatusBadge = ({ status }: { status: string }) => {
         return "bg-red-100 text-red-700";
       case "VERIFIED":
         return "bg-blue-100 text-blue-700";
+      case "HIDDEN":
+        return "bg-gray-200 text-gray-700";
       case "SOLD":
         return "bg-purple-100 text-purple-700";
       default:
@@ -211,7 +213,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBadgeStyle()}`}>
-      {status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}
+      {status === "HIDDEN" ? "Hidden" : status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}
     </span>
   );
 };
@@ -830,6 +832,7 @@ export default function PropertyManagement() {
                 <option value="VERIFIED">Verified</option>
                 <option value="REJECTED">Rejected</option>
                 <option value="ACTIVE">Active</option>
+                <option value="HIDDEN">Hidden</option>
                 <option value="SOLD">Sold</option>
               </select>
             </div>

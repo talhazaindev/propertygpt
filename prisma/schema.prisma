@@ -97,6 +97,7 @@ enum PropertyStatus {
   VERIFIED
   REJECTED
   ACTIVE
+  HIDDEN
   SOLD
 }
 

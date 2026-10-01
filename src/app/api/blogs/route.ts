@@ -77,11 +77,16 @@ export async function GET(req: NextRequest) {
     const total = await db.collection("BlogPost").countDocuments(query);
 
     // Fetch author details
-    const authorIds = blogs.map((blog) => new ObjectId(blog.authorId));
-    const authors = await db
-      .collection("TeamMember")
-      .find({ _id: { $in: authorIds } })
-      .toArray() as TeamMemberDocument[];
+    const authorIds = blogs
+      .map((blog) => blog.authorId)
+      .filter((id) => id && ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+    const authors = authorIds.length
+      ? ((await db
+          .collection("TeamMember")
+          .find({ _id: { $in: authorIds } })
+          .toArray()) as TeamMemberDocument[])
+      : [];
 
     // Map authors to blogs
     const blogsWithAuthors = blogs.map((blog) => {

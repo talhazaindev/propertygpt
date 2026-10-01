@@ -126,75 +126,73 @@ export default function BlogDetailPage() {
   }
 
   return (
-    <main className="bg-slate-50 min-h-screen pt-20">
+    <main className="min-h-screen bg-background">
       {/* Hero Image */}
-      <div className="w-full h-64 md:h-96 relative bg-gradient-to-r from-primary to-secondary">
+      <div className="relative h-64 w-full bg-secondary md:h-96">
         {blog.coverImage ? (
-          <Image
-            src={blog.coverImage}
-            alt={blog.title}
-            className="w-full h-full object-cover"
-            fill
-            priority
-          />
+          blog.coverImage.startsWith("data:") ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={blog.coverImage}
+              alt={blog.title}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Image
+              src={blog.coverImage}
+              alt={blog.title}
+              className="object-cover"
+              fill
+              priority
+              sizes="100vw"
+            />
+          )
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <BookOpen size={80} className="text-white/40" />
+          <div className="flex h-full w-full items-center justify-center">
+            <BookOpen size={80} className="text-primary/30" />
           </div>
         )}
       </div>
       
       {/* Blog Content */}
-      <article className="max-w-4xl mx-auto px-4 py-12 bg-white -mt-10 rounded-t-3xl shadow-sm">
+      <article className="relative z-10 mx-auto -mt-10 max-w-4xl rounded-t-3xl border border-border bg-card px-4 py-12 shadow-sm sm:px-8">
         {/* Back to blogs link */}
         <Link
           href="/blogs"
-          className="inline-flex items-center text-sm text-secondary hover:text-primary transition-colors duration-200 mb-8 group"
+          className="group mb-8 inline-flex items-center text-sm text-primary hover:underline"
         >
-          <ArrowLeft size={16} className="mr-1 group-hover:-translate-x-1 transition-transform duration-200" /> Back to all blogs
+          <ArrowLeft size={16} className="mr-1 transition-transform duration-200 group-hover:-translate-x-1" /> Back to all blogs
         </Link>
         
         {/* Article header */}
         <header className="mb-10">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-6">
+          <h1 className="font-serif text-3xl font-semibold text-foreground md:text-4xl lg:text-5xl">
             {blog.title}
           </h1>
           
-          <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500 mb-6">
+          <div className="mb-6 mt-6 flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
             {/* Author */}
             <div className="flex items-center">
-              {blog.author?.image ? (
-                <div className="flex-shrink-0 h-10 w-10 relative">
-                  <Image
-                    src={blog.author.image}
-                    alt={blog.author.name}
-                    className="w-10 h-10 rounded-full object-cover ring-2 ring-primary/20"
-                    width={40}
-                    height={40}
-                  />
-                </div>
-              ) : (
-                <div className="flex-shrink-0 h-10 w-10 bg-secondary/10 rounded-full flex items-center justify-center">
-                  <User size={18} className="text-secondary" />
-                </div>
-              )}
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-primary">
+                <User size={18} />
+              </div>
               <div className="ml-3">
-                <p className="font-medium text-gray-900">{blog.author?.name || "Manzil By AlWahabCo Team"}</p>
+                <p className="font-medium text-foreground">{blog.author?.name || "Manzil By AlWahabCo Team"}</p>
               </div>
             </div>
             
             {/* Date */}
             <div className="flex items-center">
-              <Clock size={16} className="mr-1 text-secondary/70" />
+              <Clock size={16} className="mr-1 text-primary/70" />
               {blog.publishedAt ? formatDate(blog.publishedAt) : formatDate(blog.createdAt)}
             </div>
             
             {/* Share button */}
             <button 
               onClick={handleShare}
-              className="flex items-center gap-1 ml-auto text-secondary hover:text-primary transition-colors duration-200 group"
+              className="group ml-auto flex items-center gap-1 text-primary transition-colors"
             >
-              <Share2 size={16} className="group-hover:rotate-12 transition-transform duration-200" />
+              <Share2 size={16} className="transition-transform duration-200 group-hover:rotate-12" />
               <span>Share</span>
             </button>
           </div>
@@ -220,24 +218,39 @@ export default function BlogDetailPage() {
         </header>
         
         {/* Article content */}
-        <div className="prose prose-lg max-w-none prose-headings:text-secondary prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-img:rounded-xl">
-          <div dangerouslySetInnerHTML={{ __html: blog.content }} />
+        <div className="prose prose-lg max-w-none prose-headings:text-foreground prose-a:text-primary">
+          {/<[a-z][\s\S]*>/i.test(blog.content) ? (
+            <div dangerouslySetInnerHTML={{ __html: blog.content }} />
+          ) : (
+            <div className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
+              {blog.content}
+            </div>
+          )}
         </div>
         
         {/* Additional images */}
         {blog.images && blog.images.length > 0 && (
           <div className="mt-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Gallery</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h2 className="mb-6 font-serif text-2xl font-semibold text-foreground">Gallery</h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {blog.images.map((image, index) => (
-                <div key={index} className="rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
-                  <Image
-                    src={image}
-                    alt={`Image ${index + 1}`}
-                    className="w-full h-auto"
-                    width={500}
-                    height={300}
-                  />
+                <div key={index} className="overflow-hidden rounded-lg border border-border">
+                  {image.startsWith("data:") ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={image}
+                      alt={`Image ${index + 1}`}
+                      className="h-auto w-full"
+                    />
+                  ) : (
+                    <Image
+                      src={image}
+                      alt={`Image ${index + 1}`}
+                      className="h-auto w-full"
+                      width={500}
+                      height={300}
+                    />
+                  )}
                 </div>
               ))}
             </div>

@@ -90,8 +90,8 @@ const Header = () => {
               <a href="#listings" className={navLinkClass}>
                 Listings
               </a>
-              <a href="#promise" className={navLinkClass}>
-                Our Promise
+              <a href="#blogs" className={navLinkClass}>
+                Blog
               </a>
               <a href="#reviews" className={navLinkClass}>
                 Reviews
@@ -205,8 +205,8 @@ const Header = () => {
                 <a href="#listings" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
                   Listings
                 </a>
-                <a href="#promise" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
-                  Our Promise
+                <a href="#blogs" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
+                  Blog
                 </a>
                 <a href="#reviews" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
                   Reviews

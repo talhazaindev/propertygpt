@@ -164,7 +164,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     
     const { status, rejectionReason, verifiedAt } = body;
     
-    if (!status || !['PENDING', 'VERIFIED', 'REJECTED', 'ACTIVE', 'SOLD'].includes(status)) {
+    if (!status || !['PENDING', 'VERIFIED', 'REJECTED', 'ACTIVE', 'HIDDEN', 'SOLD'].includes(status)) {
       console.log("Invalid status provided:", status);
       return NextResponse.json(
         { error: "Valid status is required" },
@@ -191,7 +191,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     
     // If no team member found from session, try to find any superadmin as fallback
-    if (!teamMember && ['VERIFIED', 'ACTIVE', 'REJECTED'].includes(status)) {
+    if (!teamMember && ['VERIFIED', 'ACTIVE', 'HIDDEN', 'REJECTED'].includes(status)) {
       console.log("No team member from session, searching for a superadmin...");
       teamMember = await prisma.teamMember.findFirst({
         where: { 
@@ -203,7 +203,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     
     // Extra fallback - use any active team member
-    if (!teamMember && ['VERIFIED', 'ACTIVE', 'REJECTED'].includes(status)) {
+    if (!teamMember && ['VERIFIED', 'ACTIVE', 'HIDDEN', 'REJECTED'].includes(status)) {
       console.log("No superadmin found, searching for any active team member...");
       teamMember = await prisma.teamMember.findFirst({
         where: { isActive: true }
@@ -213,7 +213,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     // verifierId is optional — allow status updates without a team member
     // (admin panel often authenticates via x-admin-auth without a TeamMember session)
-    if (!teamMember && ['VERIFIED', 'ACTIVE', 'REJECTED'].includes(status)) {
+    if (!teamMember && ['VERIFIED', 'ACTIVE', 'HIDDEN', 'REJECTED'].includes(status)) {
       console.warn("No team member found; proceeding without verifierId");
     }
     
