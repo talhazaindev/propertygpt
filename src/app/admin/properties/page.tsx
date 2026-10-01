@@ -353,22 +353,8 @@ export default function PropertyManagement() {
     }
   };
   
-  const activateProperty = async (propertyId: string) => {
-    try {
-      await axios.patch(`/api/admin/properties/${propertyId}`, {
-        status: "ACTIVE",
-      }, {
-        headers: {
-          'x-admin-auth': 'true',
-          'Content-Type': 'application/json'
-        }
-      });
-      toast.success("Property activated successfully");
-      fetchProperties();
-    } catch (error) {
-      console.error("Error activating property:", error);
-      toast.error("Failed to activate property");
-    }
+  const activateProperty = (propertyId: string) => {
+    router.push(`/admin/post-property/${propertyId}`);
   };
   
   const openRejectDialog = (propertyId: string) => {
@@ -502,7 +488,7 @@ export default function PropertyManagement() {
         <button
           onClick={() => activateProperty(property.id)}
           className="p-1.5 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors"
-          title="Activate Property"
+          title="Post Property"
         >
           <CheckCircle className="h-4 w-4" />
         </button>
@@ -575,9 +561,28 @@ export default function PropertyManagement() {
             Featured
           </div>
         )}
-        <div className="absolute top-2 right-2 text-xs bg-black bg-opacity-60 text-white px-2 py-1 rounded-full">
-          {property.listingType === "SALE" ? "For Sale" : "For Rent"}
+        <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+          <span className="text-xs bg-black bg-opacity-60 text-white px-2 py-1 rounded-full">
+            {property.listingType === "SALE" ? "For Sale" : "For Rent"}
+          </span>
+          <StatusBadge status={property.status} />
         </div>
+        {["VERIFIED", "ACTIVE"].includes(property.status) ? (
+          <div className="absolute bottom-2 left-2 inline-flex items-center gap-1 bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded-full shadow">
+            <CheckCircle className="h-3 w-3" />
+            Verified
+          </div>
+        ) : property.status === "PENDING" ? (
+          <div className="absolute bottom-2 left-2 inline-flex items-center gap-1 bg-amber-500 text-white text-xs font-semibold px-2 py-1 rounded-full shadow">
+            <AlertCircle className="h-3 w-3" />
+            Not Verified
+          </div>
+        ) : property.status === "REJECTED" ? (
+          <div className="absolute bottom-2 left-2 inline-flex items-center gap-1 bg-red-600 text-white text-xs font-semibold px-2 py-1 rounded-full shadow">
+            <XCircle className="h-3 w-3" />
+            Rejected
+          </div>
+        ) : null}
       </div>
       
       <div className="p-4">
@@ -630,6 +635,16 @@ export default function PropertyManagement() {
               />
             ) : (
               <Building2 className="h-6 w-6 text-gray-400 absolute inset-0 m-auto" />
+            )}
+            {["VERIFIED", "ACTIVE"].includes(property.status) && (
+              <div className="absolute inset-x-0 bottom-0 bg-green-600/90 text-white text-[9px] font-semibold text-center leading-4">
+                Verified
+              </div>
+            )}
+            {property.status === "PENDING" && (
+              <div className="absolute inset-x-0 bottom-0 bg-amber-500/90 text-white text-[9px] font-semibold text-center leading-4">
+                Unverified
+              </div>
             )}
           </div>
           <div>

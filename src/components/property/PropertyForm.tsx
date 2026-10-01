@@ -287,13 +287,28 @@ export default function PropertyForm({
           uploadError instanceof Error
             ? uploadError.message
             : "File upload failed";
+        const lower = message.toLowerCase();
+
         if (
-          message.toLowerCase().includes("unauthorized") ||
-          message.toLowerCase().includes("token") ||
-          message.toLowerCase().includes("uploadthing")
+          lower.includes("invalid token") ||
+          lower.includes("failed to parse") ||
+          lower.includes("unexpected end of json")
         ) {
           throw new Error(
-            "File upload is not configured. Set UPLOADTHING_TOKEN in your environment (UploadThing dashboard)."
+            "UploadThing token is invalid or incomplete. Re-copy UPLOADTHING_TOKEN from the dashboard (include any trailing '=')."
+          );
+        }
+        if (lower.includes("unauthorized") || lower.includes("unauthenticated")) {
+          throw new Error("Please sign in again, then retry the upload.");
+        }
+        if (
+          lower.includes("missing secret") ||
+          lower.includes("no token") ||
+          lower.includes("uploadthing_token") ||
+          (lower.includes("uploadthing") && lower.includes("not configured"))
+        ) {
+          throw new Error(
+            "File upload is not configured. Set UPLOADTHING_TOKEN in your environment (UploadThing dashboard), then restart the server / redeploy."
           );
         }
         throw new Error(message);

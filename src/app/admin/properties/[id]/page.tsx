@@ -119,30 +119,8 @@ export default function PropertyDetail() {
     }
   };
   
-  const activateProperty = async () => {
-    try {
-      const baseUrl = window.location.origin;
-      await axios.patch(`${baseUrl}/api/admin/properties`, {
-        id: propertyId,
-        status: "ACTIVE"
-      }, {
-        headers: {
-          'x-admin-auth': 'true',
-          'Content-Type': 'application/json'
-        }
-      });
-      toast.success("Property activated successfully");
-      fetchProperty();
-    } catch (error: any) {
-      console.error("Error activating property:", error);
-      if (error.response?.status === 404) {
-        toast.error("API endpoint not found. Please check the URL path.");
-      } else if (error.response?.data?.error) {
-        toast.error(`Error: ${error.response.data.error}`);
-      } else {
-        toast.error("Failed to activate property");
-      }
-    }
+  const activateProperty = () => {
+    router.push(`/admin/post-property/${propertyId}`);
   };
   
   const openRejectDialog = () => {

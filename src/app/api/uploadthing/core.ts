@@ -1,16 +1,21 @@
 import { createUploadthing, type FileRouter } from "uploadthing/next";
 import { UploadThingError } from "uploadthing/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getToken } from "next-auth/jwt";
+import type { NextRequest } from "next/server";
 
 const f = createUploadthing();
 
-async function requireUserId(): Promise<string> {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+async function requireUserId(req: Request): Promise<string> {
+  const token = await getToken({
+    req: req as NextRequest,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
+
+  if (!token?.id && !token?.sub) {
     throw new UploadThingError("Unauthorized");
   }
-  return session.user.id;
+
+  return String(token.id ?? token.sub);
 }
 
 /**
@@ -24,8 +29,8 @@ export const ourFileRouter = {
       maxFileCount: 10,
     },
   })
-    .middleware(async () => {
-      const userId = await requireUserId();
+    .middleware(async ({ req }) => {
+      const userId = await requireUserId(req);
       return { userId };
     })
     .onUploadComplete(async ({ metadata, file }) => {
@@ -46,8 +51,8 @@ export const ourFileRouter = {
       maxFileCount: 5,
     },
   })
-    .middleware(async () => {
-      const userId = await requireUserId();
+    .middleware(async ({ req }) => {
+      const userId = await requireUserId(req);
       return { userId };
     })
     .onUploadComplete(async ({ metadata, file }) => {
