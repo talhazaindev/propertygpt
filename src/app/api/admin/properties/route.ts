@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type");
     const listingType = searchParams.get("listingType");
     const searchTerm = searchParams.get("search");
+    const agentVerificationStatus = searchParams.get("agentVerificationStatus");
     
     // Calculate pagination
     const skip = (page - 1) * limit;
@@ -64,6 +65,9 @@ export async function GET(request: NextRequest) {
     }
     if (type) filter.type = type;
     if (listingType) filter.listingType = listingType;
+    if (agentVerificationStatus) {
+      filter.agentVerificationStatus = agentVerificationStatus;
+    }
     if (searchTerm) {
       filter.OR = [
         { title: { contains: searchTerm, mode: 'insensitive' } },
@@ -79,7 +83,17 @@ export async function GET(request: NextRequest) {
         include: {
           owner: true,
           city: { select: { id: true, name: true } },
-          verifiedBy: { select: { id: true, name: true } }
+          verifiedBy: { select: { id: true, name: true } },
+          assignedAgent: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              agentProfile: {
+                select: { id: true, businessName: true, trustScore: true },
+              },
+            },
+          },
         },
         skip,
         take: limit,

@@ -45,6 +45,13 @@ interface Property {
   };
   rejectionReason?: string;
   description: string;
+  agentVerificationStatus?: string | null;
+  assignedAgent?: {
+    id: string;
+    name?: string | null;
+    email?: string;
+    agentProfile?: { businessName?: string } | null;
+  } | null;
 }
 
 // Default external placeholder for property images
@@ -226,6 +233,7 @@ export default function PropertyManagement() {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedListingType, setSelectedListingType] = useState<string | null>(null);
+  const [selectedAgentVerification, setSelectedAgentVerification] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProperties, setTotalProperties] = useState(0);
   const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
@@ -280,6 +288,9 @@ export default function PropertyManagement() {
       if (selectedType) params.append("type", selectedType);
       if (selectedStatus) params.append("status", selectedStatus);
       if (selectedListingType) params.append("listingType", selectedListingType);
+      if (selectedAgentVerification) {
+        params.append("agentVerificationStatus", selectedAgentVerification);
+      }
       if (searchTerm) params.append("search", searchTerm);
       
       const response = await axios.get(`/api/admin/properties?${params.toString()}`, {
@@ -317,7 +328,7 @@ export default function PropertyManagement() {
   
   useEffect(() => {
     fetchProperties();
-  }, [currentPage, selectedType, selectedStatus, selectedListingType, searchTerm]);
+  }, [currentPage, selectedType, selectedStatus, selectedListingType, selectedAgentVerification, searchTerm]);
   
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -585,6 +596,12 @@ export default function PropertyManagement() {
             Rejected
           </div>
         ) : null}
+        {property.agentVerificationStatus === "SUBMITTED" && (
+          <div className="absolute bottom-2 right-2 inline-flex items-center gap-1 bg-indigo-600 text-white text-xs font-semibold px-2 py-1 rounded-full shadow">
+            <UserCheck className="h-3 w-3" />
+            Agent verified
+          </div>
+        )}
       </div>
       
       <div className="p-4">
@@ -615,6 +632,16 @@ export default function PropertyManagement() {
           <div className="text-sm">
             <p className="text-gray-500">Owner:</p>
             <p className="font-medium truncate max-w-[150px]">{property.owner?.name || 'Unknown'}</p>
+            {property.agentVerificationStatus === "SUBMITTED" && (
+              <p className="mt-1 text-xs font-medium text-indigo-700">
+                Agent verified
+                {property.assignedAgent?.agentProfile?.businessName
+                  ? ` · ${property.assignedAgent.agentProfile.businessName}`
+                  : property.assignedAgent?.name
+                    ? ` · ${property.assignedAgent.name}`
+                    : ""}
+              </p>
+            )}
           </div>
           <PropertyActions property={property} />
         </div>
@@ -672,7 +699,15 @@ export default function PropertyManagement() {
       </td>
       <td className="py-3 px-2 text-sm">{property.owner?.name || 'Unknown'}</td>
       <td className="py-3 px-2">
-        <StatusBadge status={property.status} />
+        <div className="flex flex-col gap-1 items-start">
+          <StatusBadge status={property.status} />
+          {property.agentVerificationStatus === "SUBMITTED" && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-800">
+              <UserCheck className="h-3 w-3" />
+              Agent verified
+            </span>
+          )}
+        </div>
       </td>
       <td className="py-3 px-2">
         <PropertyActions property={property} />
@@ -848,6 +883,24 @@ export default function PropertyManagement() {
                 <option value="">All Listings</option>
                 <option value="SALE">For Sale</option>
                 <option value="RENTAL">For Rent</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="agent-verification-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                Agent verification
+              </label>
+              <select
+                id="agent-verification-filter"
+                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                value={selectedAgentVerification || ""}
+                onChange={(e) => setSelectedAgentVerification(e.target.value || null)}
+              >
+                <option value="">All</option>
+                <option value="SUBMITTED">Agent verified (awaiting review)</option>
+                <option value="IN_PROGRESS">In progress with agent</option>
+                <option value="ASSIGNED">Assigned to agent</option>
+                <option value="COMPLETED">Agent work completed</option>
               </select>
             </div>
           </div>

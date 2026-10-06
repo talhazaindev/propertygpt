@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { verificationDocumentTypeLabels, type VerificationDocument } from "@/schemas/property";
 import AssignAgentPanel from "@/components/admin/AssignAgentPanel";
 import AdminPropertyEditForm from "@/components/admin/AdminPropertyEditForm";
+import AdminAgentVerificationReview from "@/components/admin/AdminAgentVerificationReview";
 
 function isImageDocument(url: string, fileName?: string): boolean {
   const target = (fileName || url).toLowerCase();
@@ -508,9 +509,15 @@ export default function PropertyDetail() {
             onUpdated={fetchProperty}
           />
 
+          <AdminAgentVerificationReview
+            property={property}
+            verifying={false}
+            onVerify={verifyProperty}
+          />
+
           {/* Verification Documents */}
           <div className="p-6 border-t border-gray-200">
-            <h2 className="text-lg font-semibold mb-4">Verification Documents</h2>
+            <h2 className="text-lg font-semibold mb-4">Owner verification documents</h2>
             {Array.isArray(property.verificationDocuments) && property.verificationDocuments.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {property.verificationDocuments.map((doc: VerificationDocument, index: number) => (

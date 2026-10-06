@@ -31,6 +31,7 @@ import {
   Clock3,
   BadgeCheck,
 } from "lucide-react";
+import AgentAssignedVerificationCard from "@/components/agent/AgentAssignedVerificationCard";
 
 type DashData = {
   profile: any;
@@ -122,8 +123,6 @@ function AgentDashboardInner() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<string | null>(null);
-  const [verifyNotes, setVerifyNotes] = useState<Record<string, string>>({});
-  const [verifyBusy, setVerifyBusy] = useState<string | null>(null);
 
   const {
     register,
@@ -193,36 +192,6 @@ function AgentDashboardInner() {
       );
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const submitVerification = async (
-    propertyId: string,
-    markInProgress?: boolean
-  ) => {
-    const notes = verifyNotes[propertyId]?.trim() || "";
-    if (!markInProgress && notes.length < 10) {
-      setSubmitMsg("Add at least 10 characters of verification notes.");
-      return;
-    }
-    try {
-      setVerifyBusy(propertyId);
-      await axios.patch(`/api/agents/properties/${propertyId}/verify`, {
-        notes: notes || "Started verification work.",
-        markInProgress: !!markInProgress,
-      });
-      setSubmitMsg(
-        markInProgress ? "Marked in progress." : "Verification submitted."
-      );
-      await load();
-    } catch (err: unknown) {
-      setSubmitMsg(
-        axios.isAxiosError(err) && err.response?.data?.error
-          ? err.response.data.error
-          : "Could not update verification"
-      );
-    } finally {
-      setVerifyBusy(null);
     }
   };
 
@@ -590,72 +559,14 @@ function AgentDashboardInner() {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-5">
                     {data.assignedForVerification.map((prop) => (
-                      <div
+                      <AgentAssignedVerificationCard
                         key={prop.id}
-                        className="rounded-2xl border border-[#dbe0d6] bg-white p-4 shadow-[0_8px_24px_-18px_rgba(25,91,59,0.4)]"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="font-serif text-lg font-semibold text-[#18221b]">
-                                {prop.title}
-                              </h3>
-                              <span
-                                className={`rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${statusTone(
-                                  prop.agentVerificationStatus
-                                )}`}
-                              >
-                                {prop.agentVerificationStatus}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-sm text-[#5c6b61]">
-                              {prop.address}
-                              {prop.city?.name ? ` · ${prop.city.name}` : ""}
-                            </p>
-                          </div>
-                          <p className="rounded-lg bg-[#195b3b]/8 px-3 py-1.5 font-serif text-lg font-semibold text-[#195b3b]">
-                            {formatPkr(prop.price)}
-                          </p>
-                        </div>
-                        <textarea
-                          className="mt-3 w-full rounded-xl border border-[#dbe0d6] bg-[#faf8f3] px-3.5 py-2.5 text-sm outline-none transition focus:border-[#195b3b] focus:ring-2 focus:ring-[#195b3b]/15"
-                          rows={3}
-                          placeholder="Verification notes — site visit, documents, ownership checks…"
-                          value={
-                            verifyNotes[prop.id] ||
-                            prop.agentVerificationNotes ||
-                            ""
-                          }
-                          onChange={(e) =>
-                            setVerifyNotes((m) => ({
-                              ...m,
-                              [prop.id]: e.target.value,
-                            }))
-                          }
-                        />
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            disabled={verifyBusy === prop.id}
-                            onClick={() => submitVerification(prop.id, true)}
-                            className="rounded-xl border border-[#dbe0d6] bg-white px-4 py-2 text-sm font-medium text-[#18221b] transition hover:bg-[#edf0e7] disabled:opacity-60"
-                          >
-                            Mark in progress
-                          </button>
-                          <button
-                            type="button"
-                            disabled={verifyBusy === prop.id}
-                            onClick={() => submitVerification(prop.id, false)}
-                            className="rounded-xl bg-gradient-to-r from-[#195b3b] to-[#2a7a52] px-4 py-2 text-sm font-semibold text-[#faf8f3] shadow-sm transition hover:opacity-95 disabled:opacity-60"
-                          >
-                            {verifyBusy === prop.id
-                              ? "Saving…"
-                              : "Submit verification"}
-                          </button>
-                        </div>
-                      </div>
+                        property={prop}
+                        onUpdated={load}
+                        onMessage={setSubmitMsg}
+                      />
                     ))}
                   </div>
                 )}

@@ -76,10 +76,32 @@ export const agentTargetSchema = z.object({
 });
 
 export const agentPropertyVerificationSchema = z.object({
-  notes: z.string().min(10, { message: "Add verification notes (at least 10 characters)" }),
+  remarks: z
+    .string()
+    .min(10, { message: "Remarks must be at least 10 characters" }),
+  verifiedItems: z
+    .string()
+    .min(10, { message: "Describe what you verified (at least 10 characters)" }),
+  verificationSource: z
+    .string()
+    .min(5, { message: "Tell us your source of verification" }),
+  documents: z
+    .array(
+      z.object({
+        type: z.string().min(1),
+        url: z.string().url(),
+        fileName: z.string().min(1),
+      })
+    )
+    .min(1, { message: "Upload at least one verified document" }),
   markInProgress: z.boolean().optional(),
+  // legacy alias
+  notes: z.string().optional(),
 });
 
 export type AgentApplyFormValues = z.infer<typeof agentApplySchema>;
 export type AgentRequestCreateValues = z.infer<typeof agentRequestCreateSchema>;
 export type AgentTargetFormValues = z.infer<typeof agentTargetSchema>;
+export type AgentPropertyVerificationValues = z.infer<
+  typeof agentPropertyVerificationSchema
+>;

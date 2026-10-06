@@ -157,6 +157,10 @@ model Property {
   assignedAt      DateTime?
   agentVerificationStatus AgentVerificationStatus @default(NONE)
   agentVerificationNotes  String?
+  agentVerificationRemarks String?
+  agentVerifiedItems      String?
+  agentVerificationSource String?
+  agentVerifiedDocuments  Json[]   @default([])
   agentVerificationSubmittedAt DateTime?
   adminPreparedAt DateTime?
   
