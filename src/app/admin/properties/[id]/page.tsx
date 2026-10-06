@@ -9,6 +9,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
 import { verificationDocumentTypeLabels, type VerificationDocument } from "@/schemas/property";
+import AssignAgentPanel from "@/components/admin/AssignAgentPanel";
+import AdminPropertyEditForm from "@/components/admin/AdminPropertyEditForm";
 
 function isImageDocument(url: string, fileName?: string): boolean {
   const target = (fileName || url).toLowerCase();
@@ -494,6 +496,17 @@ export default function PropertyDetail() {
               </dl>
             </div>
           </div>
+
+          <AdminPropertyEditForm property={property} onSaved={fetchProperty} />
+
+          <AssignAgentPanel
+            propertyId={propertyId}
+            adminPreparedAt={property.adminPreparedAt}
+            assignedAgent={property.assignedAgent}
+            agentVerificationStatus={property.agentVerificationStatus}
+            agentVerificationNotes={property.agentVerificationNotes}
+            onUpdated={fetchProperty}
+          />
 
           {/* Verification Documents */}
           <div className="p-6 border-t border-gray-200">

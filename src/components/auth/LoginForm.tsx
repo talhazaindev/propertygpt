@@ -39,8 +39,23 @@ export default function LoginForm() {
   const onSubmit = async (data: LoginFormValues) => {
     const result = await login(data);
     if (result.success) {
-      const callbackUrl = searchParams.get("callbackUrl") || "/";
-      router.replace(callbackUrl);
+      const callbackUrl = searchParams.get("callbackUrl");
+      if (callbackUrl) {
+        router.replace(callbackUrl);
+        return;
+      }
+      // Agents land on their dashboard after sign-in
+      try {
+        const res = await fetch("/api/auth/session");
+        const session = await res.json();
+        if (session?.user?.role === "AGENT") {
+          router.replace("/agent/dashboard");
+          return;
+        }
+      } catch {
+        // fall through to home
+      }
+      router.replace("/");
     }
   };
 
@@ -142,6 +157,22 @@ export default function LoginForm() {
           Create account
         </Link>
       </p>
+
+      <div className="mt-8 rounded-xl border border-border bg-muted/40 p-5 text-center">
+        <p className="font-serif text-lg font-semibold text-foreground">
+          Join our team as an agent
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Exclusive benefits, access to unlimited clients and properties, and a
+          community you can rely on — while you stay owner of your own business.
+        </p>
+        <Link
+          href="/join-as-agent"
+          className="mt-4 inline-flex rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary hover:text-primary-foreground"
+        >
+          Apply to become an agent
+        </Link>
+      </div>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
   FileText,
   HardHat,
   BookOpen,
+  Handshake,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -96,6 +97,9 @@ const Header = () => {
               <a href="#reviews" className={navLinkClass}>
                 Reviews
               </a>
+              <a href="#agents" className={navLinkClass}>
+                Join as an agent
+              </a>
             </>
           ) : (
             <>
@@ -110,6 +114,9 @@ const Header = () => {
               </Link>
               <Link href="/blogs" className={navLinkClass}>
                 Blogs
+              </Link>
+              <Link href="/join-as-agent" className={navLinkClass}>
+                Join as an agent
               </Link>
             </>
           )}
@@ -153,10 +160,16 @@ const Header = () => {
                     <p className="truncate text-xs text-muted-foreground">{session?.user?.email}</p>
                   </div>
                   <Link
-                    href="/dashboard"
+                    href={
+                      session?.user?.role === "AGENT"
+                        ? "/agent/dashboard"
+                        : "/dashboard"
+                    }
                     className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
                   >
-                    Dashboard
+                    {session?.user?.role === "AGENT"
+                      ? "Agent dashboard"
+                      : "Dashboard"}
                   </Link>
                   <button
                     type="button"
@@ -211,6 +224,9 @@ const Header = () => {
                 <a href="#reviews" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
                   Reviews
                 </a>
+                <a href="#agents" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
+                  Join as an agent
+                </a>
                 <div className="my-2 border-t border-border" />
               </>
             )}
@@ -226,6 +242,15 @@ const Header = () => {
             <Link href="/blogs" className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
               <BookOpen className="h-4 w-4 text-primary" /> Blogs
             </Link>
+            {!isHomePage && (
+              <Link
+                href="/join-as-agent"
+                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <Handshake className="h-4 w-4 text-primary" /> Join as an agent
+              </Link>
+            )}
             <div className="my-2 border-t border-border" />
             {status === "loading" ? null : !isAuthenticated ? (
               <>
@@ -238,8 +263,18 @@ const Header = () => {
               </>
             ) : (
               <>
-                <Link href="/dashboard" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
-                  Dashboard
+                <Link
+                  href={
+                    session?.user?.role === "AGENT"
+                      ? "/agent/dashboard"
+                      : "/dashboard"
+                  }
+                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  {session?.user?.role === "AGENT"
+                    ? "Agent dashboard"
+                    : "Dashboard"}
                 </Link>
                 <button type="button" onClick={handleSignOut} className="rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50">
                   Sign out

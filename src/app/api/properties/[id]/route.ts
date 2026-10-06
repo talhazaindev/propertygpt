@@ -69,6 +69,7 @@ export async function GET(
     
     // Fetch owner info if available
     let owner = null;
+    let agentTrustProfile = null;
     if (property.ownerId) {
       try {
         const usersCollection = db.collection('User');
@@ -80,7 +81,36 @@ export async function GET(
             email: ownerDoc.email,
             phoneNumber: ownerDoc.phoneNumber || null,
             phone: ownerDoc.phoneNumber || null,
+            role: ownerDoc.role || null,
+            image: ownerDoc.image || null,
           };
+
+          if (ownerDoc.role === "AGENT") {
+            const agentProfiles = db.collection("AgentProfile");
+            const profile = await agentProfiles.findOne({
+              userId: property.ownerId,
+              status: "ACTIVE",
+            });
+            if (profile) {
+              agentTrustProfile = {
+                id: profile._id.toString(),
+                userId: profile.userId.toString(),
+                name: ownerDoc.name,
+                businessName: profile.businessName,
+                location: profile.location,
+                identityVerified: !!profile.identityVerified,
+                officeVerified: !!profile.officeVerified,
+                propertiesSold: profile.propertiesSold || 0,
+                verifiedListings: profile.verifiedListings || 0,
+                documentDisputes: profile.documentDisputes || 0,
+                cancelledTransactions: profile.cancelledTransactions || 0,
+                avgResponseMinutes: profile.avgResponseMinutes ?? null,
+                memberSince: profile.memberSince || null,
+                trustScore: profile.trustScore ?? 50,
+                isGolden: !!profile.isGolden,
+              };
+            }
+          }
         }
       } catch (ownerError) {
         console.error("[OWNER_FETCH_ERROR]", ownerError);
@@ -111,6 +141,7 @@ export async function GET(
         province: city.province
       } : null,
       owner: owner || { id: null, name: "Unknown", email: null },
+      agentTrustProfile,
       createdAt: property.createdAt,
       updatedAt: property.updatedAt,
       verifiedAt: property.verifiedAt,

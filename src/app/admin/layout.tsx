@@ -172,6 +172,18 @@ export default function AdminLayout({
               </Link>
 
               <Link
+                href="/admin/agents"
+                className={`flex items-center py-3 px-4 rounded-lg transition-all duration-200 ${
+                  pathname.startsWith("/admin/agents")
+                    ? "bg-indigo-700/50 text-white shadow-md"
+                    : "text-slate-300 hover:bg-indigo-800/30 hover:text-white"
+                }`}
+              >
+                <Shield size={18} className="mr-3" strokeWidth={2.5} />
+                <span className="font-medium">Agents</span>
+              </Link>
+
+              <Link
                 href="/admin/properties"
                 className={`flex items-center py-3 px-4 rounded-lg transition-all duration-200 ${
                   pathname.startsWith("/admin/properties")

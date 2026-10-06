@@ -21,6 +21,7 @@ import { prisma } from "@/lib/prisma";
 import PropertyCard from "@/components/PropertyCard";
 import { RequestVerificationCta } from "@/components/landing/RequestVerificationCta";
 import { AuthoritySeal } from "@/components/landing/AuthoritySeal";
+import { JoinAsAgentSection } from "@/components/landing/JoinAsAgentSection";
 import { BlogCard } from "@/components/blog/BlogCard";
 
 const getFeaturedProperties = unstable_cache(
@@ -592,6 +593,8 @@ export default async function Home() {
           ))}
         </div>
       </section>
+
+      <JoinAsAgentSection />
 
       {/* CTA */}
       <section id="cta" className="border-y border-border bg-secondary/40">

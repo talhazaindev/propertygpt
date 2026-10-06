@@ -57,10 +57,16 @@ export const useAuth = () => {
       });
       
       if (result?.error) {
-        setError(result.error);
+        // NextAuth may return CredentialsSignin or a custom thrown message
+        const raw = decodeURIComponent(result.error);
+        const errorMessage =
+          raw === "CredentialsSignin"
+            ? "Invalid email or password"
+            : raw;
+        setError(errorMessage);
         return {
           success: false,
-          error: result.error,
+          error: errorMessage,
         };
       }
       

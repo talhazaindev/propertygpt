@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { BadgeCheck, Bed, Bath, Square, MapPin, Calendar, Phone, Mail, Loader2 } from "lucide-react";
 import { useParams } from "next/navigation";
 import placeholderImage from '../../../../public/images/placeholder.js';
+import AgentTrustProfile from "@/components/agent/AgentTrustProfile";
 
 // Simple gray box data URI as final fallback
 const FALLBACK_IMAGE = placeholderImage;
@@ -243,6 +244,16 @@ export default function PropertyDetailPage() {
                     <div className="text-sm text-gray-500">{property.owner.email}</div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {property.agentTrustProfile && (
+              <div className="mt-6">
+                <AgentTrustProfile
+                  agent={property.agentTrustProfile}
+                  compact
+                  showLink
+                />
               </div>
             )}
           </div>

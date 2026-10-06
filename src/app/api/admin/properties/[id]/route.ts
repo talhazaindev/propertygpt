@@ -54,7 +54,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         include: {
           owner: true,
           city: true,
-          verifiedBy: true
+          verifiedBy: true,
+          assignedAgent: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              agentProfile: {
+                select: { id: true, businessName: true, trustScore: true, isGolden: true },
+              },
+            },
+          },
         }
       });
       
@@ -228,6 +238,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const db = client.db();
       const propertiesCollection = db.collection('Property');
       
+      console.log("Converting property ID to ObjectId:", propertyId);
+      const objectId = new ObjectId(propertyId);
+      console.log("ObjectId created successfully:", objectId.toString());
+
+      const propertyBefore = await propertiesCollection.findOne({ _id: objectId });
+      
       // Prepare update data
       const updateData: Record<string, any> = {
         status,
@@ -238,6 +254,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (['VERIFIED', 'ACTIVE'].includes(status)) {
         updateData.verifiedAt = verificationDate;
         updateData.verifierId = teamMember ? new ObjectId(teamMember.id) : null;
+        if (propertyBefore?.assignedAgentId) {
+          updateData.agentVerificationStatus = "COMPLETED";
+        }
       }
       
       // Add rejection reason if applicable
@@ -245,10 +264,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         updateData.rejectionReason = rejectionReason;
         updateData.verifierId = teamMember ? new ObjectId(teamMember.id) : null;
       }
-      
-      console.log("Converting property ID to ObjectId:", propertyId);
-      const objectId = new ObjectId(propertyId);
-      console.log("ObjectId created successfully:", objectId.toString());
       
       // MongoDB driver v6+ returns the document directly (or null), not { value }
       const property = await propertiesCollection.findOneAndUpdate(
@@ -263,6 +278,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           { error: "Property not found" },
           { status: 404 }
         );
+      }
+
+      // Bump agent verifiedListings when finalizing verification after agent work
+      if (
+        ["VERIFIED", "ACTIVE"].includes(status) &&
+        propertyBefore?.assignedAgentId &&
+        propertyBefore.agentVerificationStatus !== "COMPLETED"
+      ) {
+        try {
+          const agentUserId = propertyBefore.assignedAgentId.toString();
+          await prisma.agentProfile.updateMany({
+            where: { userId: agentUserId },
+            data: { verifiedListings: { increment: 1 } },
+          });
+          await prisma.agentActivity.create({
+            data: {
+              agentId: agentUserId,
+              kind: "VERIFICATION_COMPLETED",
+              message: `Verification completed for: ${property.title}`,
+              meta: { propertyId },
+            },
+          });
+        } catch (agentBumpError) {
+          console.error("Failed to update agent verifiedListings:", agentBumpError);
+        }
       }
       
       console.log("Property updated successfully with status:", property.status);
@@ -340,10 +380,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const body = await request.json();
     
     // Prevent updating certain fields
-    const { ownerId, createdAt, _id, id, ...propertyData } = body;
+    const { ownerId, createdAt, _id, id, assignedAgentId, ...propertyData } = body;
     
-    // Add updatedAt field
+    // Mark that admin reviewed/edited details before agent assignment
     propertyData.updatedAt = new Date();
+    propertyData.adminPreparedAt = new Date();
     
     try {
       // Use MongoDB client directly to avoid transaction issues

@@ -51,6 +51,9 @@ export const authOptions: NextAuthOptions = {
           where: {
             email: credentials.email,
           },
+          include: {
+            agentProfile: true,
+          },
         });
 
         if (!user || !user.hashedPassword) {
@@ -59,6 +62,19 @@ export const authOptions: NextAuthOptions = {
 
         const isValid = await compare(credentials.password, user.hashedPassword);
         if (!isValid) return null;
+
+        if (user.role === "AGENT") {
+          const profileStatus = user.agentProfile?.status;
+          if (!profileStatus || profileStatus === "PENDING") {
+            throw new Error("Your agent account is pending approval. You will be able to sign in once activated.");
+          }
+          if (profileStatus === "REJECTED") {
+            throw new Error("Your agent application was not approved. Please contact Manzil support.");
+          }
+          if (profileStatus === "SUSPENDED") {
+            throw new Error("Your agent account has been suspended. Please contact Manzil support.");
+          }
+        }
 
         return {
           id: user.id,

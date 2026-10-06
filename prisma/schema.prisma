@@ -24,7 +24,12 @@ model User {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   phoneNumber    String?
-  properties     Property[]
+  properties     Property[] @relation("PropertyOwner")
+  assignedProperties Property[] @relation("PropertyAssignedAgent")
+  agentProfile   AgentProfile?
+  agentRequests  AgentRequest[]
+  agentActivities AgentActivity[]
+  agentTargets   AgentTarget[]
 }
 
 enum Role {
@@ -82,6 +87,12 @@ model TeamMember {
 
   // Property requests assigned to this team member
   assignedRequests PropertyRequest[]
+
+  // Agents with this team member as dedicated Manzil support
+  supportedAgents AgentProfile[] @relation("AgentDedicatedSupport")
+
+  // Agent requests reviewed by this team member
+  reviewedAgentRequests AgentRequest[] @relation("AgentRequestReviewedBy")
 }
 
 enum PropertyType {
@@ -99,6 +110,14 @@ enum PropertyStatus {
   ACTIVE
   HIDDEN
   SOLD
+}
+
+enum AgentVerificationStatus {
+  NONE
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
 }
 
 enum PropertyListingType {
@@ -130,7 +149,16 @@ model Property {
   
   // Owner relationship
   ownerId     String         @db.ObjectId
-  owner       User           @relation(fields: [ownerId], references: [id])
+  owner       User           @relation("PropertyOwner", fields: [ownerId], references: [id])
+  
+  // Marketplace agent assigned to support verification
+  assignedAgentId String?    @db.ObjectId
+  assignedAgent   User?      @relation("PropertyAssignedAgent", fields: [assignedAgentId], references: [id])
+  assignedAt      DateTime?
+  agentVerificationStatus AgentVerificationStatus @default(NONE)
+  agentVerificationNotes  String?
+  agentVerificationSubmittedAt DateTime?
+  adminPreparedAt DateTime?
   
   // Verification details
   verifiedAt  DateTime?
@@ -226,4 +254,114 @@ model PropertyRequest {
   adminNotes       String?
   assignedToId     String?              @db.ObjectId
   assignedTo       TeamMember?          @relation(fields: [assignedToId], references: [id])
+}
+
+enum AgentProfileStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+enum AgentRequestType {
+  PROPERTY_ASK
+  VERIFICATION_SUPPORT
+  CLIENT_REFERRAL
+  DEAL_CLOSE
+  SUPPORT
+}
+
+enum AgentRequestStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum AgentPayoutStatus {
+  PENDING
+  APPROVED
+  PAID
+}
+
+model AgentProfile {
+  id                   String             @id @default(auto()) @map("_id") @db.ObjectId
+  userId               String             @unique @db.ObjectId
+  user                 User               @relation(fields: [userId], references: [id])
+  businessName         String
+  location             String
+  phoneNumber          String
+  businessAddress      String
+  status               AgentProfileStatus @default(PENDING)
+  identityVerified     Boolean            @default(false)
+  officeVerified       Boolean            @default(false)
+  propertiesSold       Int                @default(0)
+  verifiedListings     Int                @default(0)
+  documentDisputes     Int                @default(0)
+  cancelledTransactions Int               @default(0)
+  avgResponseMinutes   Int?
+  memberSince          DateTime?
+  trustScore           Int                @default(50)
+  trustScoreOverride   Boolean            @default(false)
+  isGolden             Boolean            @default(false)
+  dedicatedSupportId   String?            @db.ObjectId
+  dedicatedSupport     TeamMember?        @relation("AgentDedicatedSupport", fields: [dedicatedSupportId], references: [id])
+  activationToken      String?
+  activatedAt          DateTime?
+  adminNotes           String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+model AgentRequest {
+  id               String             @id @default(auto()) @map("_id") @db.ObjectId
+  agentId          String             @db.ObjectId
+  agent            User               @relation(fields: [agentId], references: [id])
+  type             AgentRequestType
+  status           AgentRequestStatus @default(PENDING)
+  title            String
+  description      String
+  propertyId       String?            @db.ObjectId
+  clientName       String?
+  clientPhone      String?
+  clientEmail      String?
+  estimatedValue   Float?
+  commissionAmount Float?
+  bonusAmount      Float?
+  payoutStatus     AgentPayoutStatus  @default(PENDING)
+  adminNotes       String?
+  reviewedById     String?            @db.ObjectId
+  reviewedBy       TeamMember?        @relation("AgentRequestReviewedBy", fields: [reviewedById], references: [id])
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+model AgentActivity {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  agentId   String   @db.ObjectId
+  agent     User     @relation(fields: [agentId], references: [id])
+  kind      String
+  message   String
+  meta      Json?
+  actorId   String?  @db.ObjectId
+  createdAt DateTime @default(now())
+}
+
+model AgentTarget {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  agentId             String   @db.ObjectId
+  agent               User     @relation(fields: [agentId], references: [id])
+  label               String   @default("This month")
+  periodStart         DateTime
+  periodEnd           DateTime
+  dealsTarget         Int      @default(0)
+  verificationsTarget Int      @default(0)
+  referralsTarget     Int      @default(0)
+  rewardDescription   String?
+  rewardAmount        Float?
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
