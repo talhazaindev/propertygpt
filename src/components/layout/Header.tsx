@@ -84,14 +84,14 @@ const Header = () => {
         <nav className="hidden items-center gap-6 lg:flex">
           {isHomePage ? (
             <>
-              <a href="#verification" className={navLinkClass}>
-                How Verification Works
-              </a>
+              <Link href="/construction" className={navLinkClass}>
+                Construction
+              </Link>
               <a href="#listings" className={navLinkClass}>
                 Listings
               </a>
               <a href="#blogs" className={navLinkClass}>
-                Blog
+                Blogs
               </a>
               <a href="#reviews" className={navLinkClass}>
                 Reviews
@@ -109,7 +109,7 @@ const Header = () => {
                 Construction
               </Link>
               <Link href="/blogs" className={navLinkClass}>
-                Blog
+                Blogs
               </Link>
             </>
           )}
@@ -199,14 +199,14 @@ const Header = () => {
           <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-4 sm:px-6">
             {isHomePage && (
               <>
-                <a href="#verification" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
-                  How Verification Works
-                </a>
+                <Link href="/construction" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
+                  Construction
+                </Link>
                 <a href="#listings" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
                   Listings
                 </a>
                 <a href="#blogs" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
-                  Blog
+                  Blogs
                 </a>
                 <a href="#reviews" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
                   Reviews
@@ -221,10 +221,10 @@ const Header = () => {
               <FileText className="h-4 w-4 text-primary" /> Request Property
             </Link>
             <Link href="/construction" className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
-              <HardHat className="h-4 w-4 text-primary" /> Hire Us To Construct
+              <HardHat className="h-4 w-4 text-primary" /> Construction
             </Link>
             <Link href="/blogs" className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted" onClick={() => setIsMenuOpen(false)}>
-              <BookOpen className="h-4 w-4 text-primary" /> Blog
+              <BookOpen className="h-4 w-4 text-primary" /> Blogs
             </Link>
             <div className="my-2 border-t border-border" />
             {status === "loading" ? null : !isAuthenticated ? (
