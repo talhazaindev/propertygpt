@@ -4,6 +4,7 @@ import prisma from "@/lib/prismadb";
 import { agentApplySchema } from "@/schemas/agent";
 import { computeTrustScore } from "@/lib/agent-trust";
 import { normalizeEmail, verifySignupToken } from "@/lib/otp";
+import { sendAgentApplicationWelcomeEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
@@ -83,6 +84,15 @@ export async function POST(request: Request) {
         meta: { email, location, businessName },
       },
     });
+
+    const welcome = await sendAgentApplicationWelcomeEmail({
+      to: email,
+      name: name || "there",
+      businessName,
+    });
+    if (!welcome.ok) {
+      console.error("[AGENT_APPLY_WELCOME_EMAIL]", welcome.error);
+    }
 
     return NextResponse.json(
       {

@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import { registerSchema } from "@/schemas/auth";
 import prisma from "@/lib/prismadb";
 import { normalizeEmail, verifySignupToken } from "@/lib/otp";
+import { sendBuyerWelcomeEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
@@ -43,6 +44,15 @@ export async function POST(request: Request) {
         emailVerified: now,
       },
     });
+
+    // Welcome email is best-effort — signup already succeeded after OTP verify
+    const welcome = await sendBuyerWelcomeEmail({
+      to: email,
+      name: name || "there",
+    });
+    if (!welcome.ok) {
+      console.error("[REGISTRATION_WELCOME_EMAIL]", welcome.error);
+    }
 
     return NextResponse.json(
       {

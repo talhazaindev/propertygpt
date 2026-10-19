@@ -1,10 +1,112 @@
 /**
  * Resend email helper.
- * Activation emails skip cleanly when RESEND_API_KEY is missing.
+ * Activation / welcome emails skip cleanly when RESEND_API_KEY is missing.
  * OTP emails must send — they fail if the key is missing.
  */
 
 type SendResult = { ok: true; skipped?: boolean; id?: string } | { ok: false; error: string };
+
+function getAppBaseUrl(): string {
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL.replace(/\/$/, "");
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`;
+  }
+  return "http://localhost:3000";
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function brandedEmailShell(params: {
+  title: string;
+  preheader: string;
+  bodyHtml: string;
+}): string {
+  const baseUrl = getAppBaseUrl();
+  const logoUrl = `${baseUrl}/images/logo-nav.jpeg`;
+  const year = new Date().getFullYear();
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(params.title)}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f1ea;font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(params.preheader)}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ea;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e6e0d4;">
+          <tr>
+            <td style="background:#1a3a2a;padding:28px 32px;text-align:center;">
+              <img src="${logoUrl}" alt="Manzil By AlWahabCo" width="160" style="display:inline-block;max-width:160px;height:auto;border:0;" />
+              <p style="margin:12px 0 0;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#c9d7cf;">
+                Manzil By AlWahabCo
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              ${params.bodyHtml}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px 28px;border-top:1px solid #eee7db;text-align:center;">
+              <p style="margin:0;font-size:12px;line-height:1.6;color:#7a7468;">
+                © ${year} Manzil By AlWahabCo. Verified property in Pakistan.
+              </p>
+              <p style="margin:8px 0 0;font-size:12px;color:#7a7468;">
+                <a href="${baseUrl}" style="color:#1a3a2a;text-decoration:none;">Visit Manzil</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim();
+}
+
+function perkListHtml(perks: string[]): string {
+  const items = perks
+    .map(
+      (perk) => `
+      <tr>
+        <td style="padding:8px 0;vertical-align:top;width:24px;color:#1a3a2a;font-weight:bold;">✓</td>
+        <td style="padding:8px 0;font-size:15px;line-height:1.5;color:#2a2a2a;">${escapeHtml(perk)}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 8px;">
+      ${items}
+    </table>
+  `;
+}
+
+function ctaButtonHtml(href: string, label: string): string {
+  return `
+    <p style="margin:28px 0 8px;text-align:center;">
+      <a href="${href}" style="display:inline-block;padding:14px 28px;background:#1a3a2a;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:bold;">
+        ${escapeHtml(label)}
+      </a>
+    </p>
+  `;
+}
 
 async function sendViaResend(
   payload: {
@@ -66,28 +168,112 @@ export async function sendAgentActivationEmail(params: {
   name: string;
   businessName: string;
 }): Promise<SendResult> {
-  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const baseUrl = getAppBaseUrl();
   const loginUrl = `${baseUrl}/login?callbackUrl=${encodeURIComponent("/agent/dashboard")}`;
+  const safeName = escapeHtml(params.name);
+  const safeBusiness = escapeHtml(params.businessName);
 
   return sendViaResend({
     to: params.to,
     subject: "Your Manzil agent account is active",
-    html: `
-      <div style="font-family: Georgia, serif; max-width: 560px; margin: 0 auto; color: #1a1a1a;">
-        <h1 style="font-size: 24px;">Welcome to the Manzil agent network</h1>
-        <p>Hi ${params.name},</p>
-        <p>
-          Your application for <strong>${params.businessName}</strong> has been approved.
+    html: brandedEmailShell({
+      title: "Agent account active",
+      preheader: "Your Manzil agent application was approved.",
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:26px;line-height:1.3;color:#1a3a2a;">Welcome to the Manzil agent network</h1>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">Hi ${safeName},</p>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">
+          Your application for <strong>${safeBusiness}</strong> has been approved.
           You can now sign in and access your agent dashboard.
         </p>
-        <p>
-          <a href="${loginUrl}" style="display:inline-block;padding:12px 20px;background:#1a3a2a;color:#fff;text-decoration:none;border-radius:6px;">
-            Sign in to your agent account
-          </a>
+        ${ctaButtonHtml(loginUrl, "Sign in to your agent account")}
+        <p style="margin:20px 0 0;font-size:13px;color:#7a7468;">If you did not apply, you can ignore this email.</p>
+      `,
+    }),
+  });
+}
+
+export async function sendBuyerWelcomeEmail(params: {
+  to: string;
+  name: string;
+}): Promise<SendResult> {
+  const baseUrl = getAppBaseUrl();
+  const loginUrl = `${baseUrl}/login`;
+  const propertiesUrl = `${baseUrl}/properties`;
+  const safeName = escapeHtml(params.name || "there");
+
+  return sendViaResend({
+    to: params.to,
+    subject: "Welcome to Manzil — verified property starts here",
+    html: brandedEmailShell({
+      title: "Welcome to Manzil",
+      preheader: "Your account is ready. Browse verified listings with confidence.",
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:26px;line-height:1.3;color:#1a3a2a;">Welcome to Manzil</h1>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">Hi ${safeName},</p>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">
+          Your email is verified and your account is ready. Manzil is Pakistan’s trust-first
+          property marketplace — every listing checked before it reaches you.
         </p>
-        <p style="color:#666;font-size:14px;">If you did not apply, you can ignore this email.</p>
-      </div>
-    `,
+        <p style="margin:20px 0 0;font-size:14px;letter-spacing:0.08em;text-transform:uppercase;color:#1a3a2a;font-weight:bold;">
+          What you get as a Manzil member
+        </p>
+        ${perkListHtml([
+          "Browse title-checked, Manzil Verified listings",
+          "Clear ownership and society-dues checks before you commit",
+          "Request verification for a property you are considering",
+          "Sell with confidence — we verify before buyers see your home",
+          "Dedicated advisors through viewing to final registry",
+        ])}
+        ${ctaButtonHtml(propertiesUrl, "Browse verified listings")}
+        <p style="margin:8px 0 0;text-align:center;font-size:14px;">
+          <a href="${loginUrl}" style="color:#1a3a2a;">Or sign in to your account</a>
+        </p>
+      `,
+    }),
+  });
+}
+
+export async function sendAgentApplicationWelcomeEmail(params: {
+  to: string;
+  name: string;
+  businessName: string;
+}): Promise<SendResult> {
+  const baseUrl = getAppBaseUrl();
+  const safeName = escapeHtml(params.name || "there");
+  const safeBusiness = escapeHtml(params.businessName);
+
+  return sendViaResend({
+    to: params.to,
+    subject: "We received your Manzil agent application",
+    html: brandedEmailShell({
+      title: "Agent application received",
+      preheader: "Thanks for applying. Your email is verified and our team will review next.",
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:26px;line-height:1.3;color:#1a3a2a;">Application received</h1>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">Hi ${safeName},</p>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">
+          Thanks for applying to join the Manzil agent network for
+          <strong>${safeBusiness}</strong>. Your email is verified. Our team will review your
+          details and email you once your account is approved.
+        </p>
+        <p style="margin:20px 0 0;font-size:14px;letter-spacing:0.08em;text-transform:uppercase;color:#1a3a2a;font-weight:bold;">
+          Partner perks after approval
+        </p>
+        ${perkListHtml([
+          "Public Agent Trust Profile clients can actually rely on",
+          "Access to Manzil buyers and verified inventory",
+          "Commission on verifications, referrals, and closed deals",
+          "Monthly targets with bonuses for top performers",
+          "Golden Agent path with dedicated Manzil support",
+          "Stay the owner of your business under Manzil’s trust umbrella",
+        ])}
+        ${ctaButtonHtml(baseUrl, "Visit Manzil")}
+        <p style="margin:20px 0 0;font-size:13px;color:#7a7468;">
+          You will get a separate activation email when your account is ready to sign in.
+        </p>
+      `,
+    }),
   });
 }
 
@@ -109,18 +295,20 @@ export async function sendSignupOtpEmail(params: {
     {
       to: params.to,
       subject: `${params.code} is your Manzil verification code`,
-      html: `
-      <div style="font-family: Georgia, serif; max-width: 560px; margin: 0 auto; color: #1a1a1a;">
-        <h1 style="font-size: 24px;">${heading}</h1>
-        <p>${context}</p>
-        <p style="font-size: 32px; letter-spacing: 8px; font-weight: bold; margin: 24px 0;">
-          ${params.code}
-        </p>
-        <p style="color:#666;font-size:14px;">
-          This code expires in ${params.expiresInMinutes} minutes. If you did not request it, you can ignore this email.
-        </p>
-      </div>
-    `,
+      html: brandedEmailShell({
+        title: "Email verification",
+        preheader: `Your Manzil verification code is ${params.code}`,
+        bodyHtml: `
+          <h1 style="margin:0 0 12px;font-size:26px;line-height:1.3;color:#1a3a2a;">${heading}</h1>
+          <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">${context}</p>
+          <p style="margin:28px 0;font-size:36px;letter-spacing:10px;font-weight:bold;text-align:center;color:#1a3a2a;">
+            ${escapeHtml(params.code)}
+          </p>
+          <p style="margin:0;font-size:13px;color:#7a7468;text-align:center;">
+            This code expires in ${params.expiresInMinutes} minutes. If you did not request it, you can ignore this email.
+          </p>
+        `,
+      }),
     },
     { required: true }
   );
