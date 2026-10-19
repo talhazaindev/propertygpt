@@ -1,10 +1,13 @@
 /**
  * Email OTP helpers for signup verification (buyer + agent).
+ *
+ * Note: On MongoDB, Prisma `where: { field: null }` does not match documents
+ * where the optional field is omitted. Always treat missing consumedAt as active.
  */
 
 import { createHmac, randomInt, timingSafeEqual } from "crypto";
 import bcrypt from "bcrypt";
-import type { OtpPurpose } from "@prisma/client";
+import type { EmailOtp, OtpPurpose } from "@prisma/client";
 import prisma from "@/lib/prismadb";
 
 const OTP_LENGTH = 6;
@@ -29,6 +32,44 @@ function getSecret(): string {
     throw new Error("NEXTAUTH_SECRET is not configured");
   }
   return secret;
+}
+
+function isActiveOtp(record: EmailOtp): boolean {
+  return record.consumedAt == null;
+}
+
+async function findLatestOtp(email: string, purpose: OtpPurpose): Promise<EmailOtp | null> {
+  return prisma.emailOtp.findFirst({
+    where: { email, purpose },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+async function findLatestActiveOtp(
+  email: string,
+  purpose: OtpPurpose
+): Promise<EmailOtp | null> {
+  const recent = await prisma.emailOtp.findMany({
+    where: { email, purpose },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+  });
+  return recent.find(isActiveOtp) ?? null;
+}
+
+async function invalidateActiveOtps(email: string, purpose: OtpPurpose): Promise<void> {
+  const recent = await prisma.emailOtp.findMany({
+    where: { email, purpose },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
+  const activeIds = recent.filter(isActiveOtp).map((r) => r.id);
+  if (activeIds.length === 0) return;
+
+  await prisma.emailOtp.updateMany({
+    where: { id: { in: activeIds } },
+    data: { consumedAt: new Date() },
+  });
 }
 
 export function generateOtpCode(): string {
@@ -105,12 +146,13 @@ export async function createAndStoreOtp(
   | { ok: false; error: string; retryAfterSeconds?: number }
 > {
   const normalized = normalizeEmail(email);
-  const latest = await prisma.emailOtp.findFirst({
-    where: { email: normalized, purpose, consumedAt: null },
-    orderBy: { createdAt: "desc" },
-  });
+  const latest = await findLatestOtp(normalized, purpose);
 
-  if (latest && Date.now() - latest.createdAt.getTime() < RESEND_COOLDOWN_MS) {
+  if (
+    latest &&
+    isActiveOtp(latest) &&
+    Date.now() - latest.createdAt.getTime() < RESEND_COOLDOWN_MS
+  ) {
     const retryAfterSeconds = Math.ceil(
       (RESEND_COOLDOWN_MS - (Date.now() - latest.createdAt.getTime())) / 1000
     );
@@ -121,11 +163,7 @@ export async function createAndStoreOtp(
     };
   }
 
-  // Invalidate outstanding codes for this email + purpose
-  await prisma.emailOtp.updateMany({
-    where: { email: normalized, purpose, consumedAt: null },
-    data: { consumedAt: new Date() },
-  });
+  await invalidateActiveOtps(normalized, purpose);
 
   const code = generateOtpCode();
   const codeHash = await hashOtpCode(code);
@@ -149,10 +187,7 @@ export async function verifyStoredOtp(
   code: string
 ): Promise<{ ok: true; signupToken: string } | { ok: false; error: string }> {
   const normalized = normalizeEmail(email);
-  const record = await prisma.emailOtp.findFirst({
-    where: { email: normalized, purpose, consumedAt: null },
-    orderBy: { createdAt: "desc" },
-  });
+  const record = await findLatestActiveOtp(normalized, purpose);
 
   if (!record) {
     return { ok: false, error: "No verification code found. Please request a new one." };
