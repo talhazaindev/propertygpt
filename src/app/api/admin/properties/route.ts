@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";
+import { sendPropertyVerifiedEmail } from "@/lib/email";
 
 // Helper function to check if user is admin
 async function isAdminOrStaff(req: NextRequest) {
@@ -274,6 +275,8 @@ export async function PATCH(request: NextRequest) {
       console.log("Converting property ID to ObjectId:", id);
       const objectId = new ObjectId(id);
       console.log("ObjectId created successfully:", objectId.toString());
+
+      const propertyBefore = await propertiesCollection.findOne({ _id: objectId });
       
       // MongoDB driver v6+ returns the document directly (or null), not { value }
       const property = await propertiesCollection.findOneAndUpdate(
@@ -288,6 +291,34 @@ export async function PATCH(request: NextRequest) {
           { error: "Property not found" },
           { status: 404 }
         );
+      }
+
+      const becameVerified =
+        ["VERIFIED", "ACTIVE"].includes(status) &&
+        !["VERIFIED", "ACTIVE"].includes(String(propertyBefore?.status || ""));
+
+      if (becameVerified && propertyBefore?.ownerId) {
+        try {
+          const owner = await db.collection("User").findOne(
+            { _id: new ObjectId(propertyBefore.ownerId.toString()) },
+            { projection: { email: 1, name: 1 } }
+          );
+          if (owner?.email) {
+            const ownerEmail = await sendPropertyVerifiedEmail({
+              to: owner.email,
+              name: owner.name || "there",
+              propertyId: id,
+              title: String(property.title || "Property"),
+              address: property.address ? String(property.address) : null,
+              price: typeof property.price === "number" ? property.price : null,
+            });
+            if (!ownerEmail.ok) {
+              console.error("[PROPERTY_VERIFIED_EMAIL]", ownerEmail.error);
+            }
+          }
+        } catch (ownerEmailError) {
+          console.error("[PROPERTY_VERIFIED_EMAIL]", ownerEmailError);
+        }
       }
       
       console.log("Property updated successfully with status:", property.status);

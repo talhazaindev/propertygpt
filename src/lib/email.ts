@@ -277,6 +277,171 @@ export async function sendAgentApplicationWelcomeEmail(params: {
   });
 }
 
+function propertySummaryHtml(params: {
+  title: string;
+  address?: string | null;
+  price?: number | null;
+}): string {
+  const rows: string[] = [
+    `<tr><td style="padding:4px 0;color:#7a7468;width:90px;">Listing</td><td style="padding:4px 0;color:#1a1a1a;"><strong>${escapeHtml(params.title)}</strong></td></tr>`,
+  ];
+  if (params.address) {
+    rows.push(
+      `<tr><td style="padding:4px 0;color:#7a7468;">Address</td><td style="padding:4px 0;color:#1a1a1a;">${escapeHtml(params.address)}</td></tr>`
+    );
+  }
+  if (typeof params.price === "number" && Number.isFinite(params.price)) {
+    rows.push(
+      `<tr><td style="padding:4px 0;color:#7a7468;">Price</td><td style="padding:4px 0;color:#1a1a1a;">PKR ${params.price.toLocaleString("en-PK")}</td></tr>`
+    );
+  }
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;padding:16px;background:#f8f5ef;border-radius:8px;">${rows.join("")}</table>`;
+}
+
+/** Owner: listing submitted and awaiting Manzil verification. */
+export async function sendPropertySubmittedEmail(params: {
+  to: string;
+  name: string;
+  propertyId: string;
+  title: string;
+  address?: string | null;
+  price?: number | null;
+}): Promise<SendResult> {
+  const baseUrl = getAppBaseUrl();
+  const propertyUrl = `${baseUrl}/properties/${params.propertyId}`;
+  const safeName = escapeHtml(params.name || "there");
+
+  return sendViaResend({
+    to: params.to,
+    subject: `We received your listing: ${params.title}`,
+    html: brandedEmailShell({
+      title: "Listing submitted",
+      preheader: "Your property was submitted for Manzil verification.",
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:26px;line-height:1.3;color:#1a3a2a;">Listing submitted for verification</h1>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">Hi ${safeName},</p>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">
+          Thank you for listing with Manzil. Your property has been submitted and is now in our
+          verification queue. We will review the title, documents, and details before it goes live.
+        </p>
+        ${propertySummaryHtml(params)}
+        <p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#2a2a2a;">
+          You will get another email as soon as verification is complete.
+        </p>
+        ${ctaButtonHtml(propertyUrl, "View your listing")}
+      `,
+    }),
+  });
+}
+
+/** Owner: listing verified / live. */
+export async function sendPropertyVerifiedEmail(params: {
+  to: string;
+  name: string;
+  propertyId: string;
+  title: string;
+  address?: string | null;
+  price?: number | null;
+}): Promise<SendResult> {
+  const baseUrl = getAppBaseUrl();
+  const propertyUrl = `${baseUrl}/properties/${params.propertyId}`;
+  const safeName = escapeHtml(params.name || "there");
+
+  return sendViaResend({
+    to: params.to,
+    subject: `Verified: ${params.title} is live on Manzil`,
+    html: brandedEmailShell({
+      title: "Listing verified",
+      preheader: "Your property passed Manzil verification and is now live.",
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:26px;line-height:1.3;color:#1a3a2a;">Your listing is verified</h1>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">Hi ${safeName},</p>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">
+          Great news — your property passed Manzil verification and is now visible to buyers
+          with the Manzil Verified badge.
+        </p>
+        ${propertySummaryHtml(params)}
+        ${ctaButtonHtml(propertyUrl, "View live listing")}
+      `,
+    }),
+  });
+}
+
+/** Agent: new verification lead assigned. */
+export async function sendAgentVerificationLeadEmail(params: {
+  to: string;
+  name: string;
+  propertyId: string;
+  title: string;
+  address?: string | null;
+  price?: number | null;
+  businessName?: string | null;
+}): Promise<SendResult> {
+  const baseUrl = getAppBaseUrl();
+  const dashboardUrl = `${baseUrl}/login?callbackUrl=${encodeURIComponent("/agent/dashboard")}`;
+  const safeName = escapeHtml(params.name || "there");
+  const businessLine = params.businessName
+    ? `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#2a2a2a;">Assigned to <strong>${escapeHtml(params.businessName)}</strong>.</p>`
+    : "";
+
+  return sendViaResend({
+    to: params.to,
+    subject: `New verification lead: ${params.title}`,
+    html: brandedEmailShell({
+      title: "New verification lead",
+      preheader: "You have a new property verification assignment on Manzil.",
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:26px;line-height:1.3;color:#1a3a2a;">New verification lead</h1>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">Hi ${safeName},</p>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">
+          You have been assigned a new property to verify. Please review the listing details,
+          complete your checks, and submit your verification report from your agent dashboard.
+        </p>
+        ${businessLine}
+        ${propertySummaryHtml(params)}
+        ${ctaButtonHtml(dashboardUrl, "Open agent dashboard")}
+      `,
+    }),
+  });
+}
+
+/** Agent: admin approved their verification work. */
+export async function sendAgentVerificationSuccessEmail(params: {
+  to: string;
+  name: string;
+  propertyId: string;
+  title: string;
+  address?: string | null;
+  price?: number | null;
+}): Promise<SendResult> {
+  const baseUrl = getAppBaseUrl();
+  const dashboardUrl = `${baseUrl}/login?callbackUrl=${encodeURIComponent("/agent/dashboard")}`;
+  const propertyUrl = `${baseUrl}/properties/${params.propertyId}`;
+  const safeName = escapeHtml(params.name || "there");
+
+  return sendViaResend({
+    to: params.to,
+    subject: `Verification approved: ${params.title}`,
+    html: brandedEmailShell({
+      title: "Verification approved",
+      preheader: "Manzil approved your property verification work.",
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:26px;line-height:1.3;color:#1a3a2a;">Verification approved</h1>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">Hi ${safeName},</p>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">
+          Excellent work — Manzil has approved your verification for this listing. It now
+          counts toward your verified listings and Trust Score progress.
+        </p>
+        ${propertySummaryHtml(params)}
+        ${ctaButtonHtml(dashboardUrl, "View agent dashboard")}
+        <p style="margin:8px 0 0;text-align:center;font-size:14px;">
+          <a href="${propertyUrl}" style="color:#1a3a2a;">Open live listing</a>
+        </p>
+      `,
+    }),
+  });
+}
+
 export async function sendSignupOtpEmail(params: {
   to: string;
   code: string;

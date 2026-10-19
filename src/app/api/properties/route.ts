@@ -15,6 +15,7 @@ import {
   type VerificationDocumentType,
 } from "@/schemas/property";
 import { z } from "zod";
+import { sendPropertySubmittedEmail } from "@/lib/email";
 
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
@@ -199,6 +200,20 @@ async function createPropertyRecord(params: {
     { _id: new ObjectId(createdProperty.ownerId) },
     { projection: { id: 1, name: 1, email: 1, image: 1 } }
   );
+
+  if (owner?.email) {
+    const submitted = await sendPropertySubmittedEmail({
+      to: owner.email,
+      name: owner.name || "there",
+      propertyId: createdProperty._id.toString(),
+      title: String(createdProperty.title || title),
+      address: createdProperty.address ? String(createdProperty.address) : address,
+      price: typeof createdProperty.price === "number" ? createdProperty.price : price,
+    });
+    if (!submitted.ok) {
+      console.error("[PROPERTY_SUBMITTED_EMAIL]", submitted.error);
+    }
+  }
 
   return {
     ...createdProperty,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";
 import prisma from "@/lib/prismadb";
+import { sendAgentVerificationLeadEmail } from "@/lib/email";
 
 function isAdminOrStaff(req: NextRequest) {
   return req.headers.get("x-admin-auth") === "true";
@@ -112,6 +113,21 @@ export async function POST(request: NextRequest, context: RouteContext) {
         meta: { propertyId },
       },
     });
+
+    if (agent.email) {
+      const leadEmail = await sendAgentVerificationLeadEmail({
+        to: agent.email,
+        name: agent.name || "there",
+        propertyId,
+        title: String(property.title || "Property"),
+        address: property.address ? String(property.address) : null,
+        price: typeof property.price === "number" ? property.price : null,
+        businessName: agent.agentProfile?.businessName || null,
+      });
+      if (!leadEmail.ok) {
+        console.error("[AGENT_LEAD_EMAIL]", leadEmail.error);
+      }
+    }
 
     return NextResponse.json({
       message: "Property assigned to agent for verification",
