@@ -93,6 +93,10 @@ export function MessagingInbox({ mode }: Props) {
     { id: string; name: string | null; email: string }[]
   >([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [userProperties, setUserProperties] = useState<
+    { id: string; title: string; label: string; status: string }[]
+  >([]);
+  const [loadingProperties, setLoadingProperties] = useState(false);
 
   const loadConversations = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -218,6 +222,48 @@ export function MessagingInbox({ mode }: Props) {
     })();
   }, [asAdmin]);
 
+  // Load user's posted properties for PROPERTY subject dropdown
+  useEffect(() => {
+    if (!showNew || newSubjectType !== "PROPERTY") {
+      return;
+    }
+    if (asAdmin && !selectedUserId) {
+      setUserProperties([]);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      setLoadingProperties(true);
+      try {
+        const qs =
+          asAdmin && selectedUserId
+            ? `?userId=${encodeURIComponent(selectedUserId)}`
+            : "";
+        const res = await messagingFetch(
+          `/api/messages/user-properties${qs}`,
+          {},
+          asAdmin
+        );
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.ok) {
+          setUserProperties(data.properties || []);
+        } else {
+          setUserProperties([]);
+        }
+      } catch {
+        if (!cancelled) setUserProperties([]);
+      } finally {
+        if (!cancelled) setLoadingProperties(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showNew, newSubjectType, asAdmin, selectedUserId]);
+
   // Primary live updates for Vercel: poll list + open thread
   useMessagingPolling({
     enabled: true,
@@ -292,7 +338,15 @@ export function MessagingInbox({ mode }: Props) {
       toast.error("Select a user");
       return;
     }
-    if (newSubjectType !== "GENERAL" && !newSubjectId.trim()) {
+    if (newSubjectType === "PROPERTY" && !newSubjectId.trim()) {
+      toast.error("Select a property");
+      return;
+    }
+    if (
+      newSubjectType !== "GENERAL" &&
+      newSubjectType !== "PROPERTY" &&
+      !newSubjectId.trim()
+    ) {
       toast.error("Enter the related record ID");
       return;
     }
@@ -317,6 +371,7 @@ export function MessagingInbox({ mode }: Props) {
       setNewBody("");
       setNewSubjectId("");
       setSelectedUserId(null);
+      setUserProperties([]);
       await loadConversations();
       setActiveId(data.conversation.id);
       toast.success("Conversation started");
@@ -660,6 +715,7 @@ export function MessagingInbox({ mode }: Props) {
                               setSelectedUserId(u.id);
                               setUserQuery(u.email);
                               setUserResults([]);
+                              setNewSubjectId("");
                             }}
                           >
                             {u.name || "—"} · {u.email}
@@ -674,11 +730,12 @@ export function MessagingInbox({ mode }: Props) {
                 <label className="text-xs text-muted-foreground">Subject</label>
                 <select
                   value={newSubjectType}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setNewSubjectType(
                       e.target.value as (typeof SUBJECT_OPTIONS)[number]["value"]
-                    )
-                  }
+                    );
+                    setNewSubjectId("");
+                  }}
                   className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
                 >
                   {SUBJECT_OPTIONS.map((o) => (
@@ -688,7 +745,42 @@ export function MessagingInbox({ mode }: Props) {
                   ))}
                 </select>
               </div>
-              {newSubjectType !== "GENERAL" && (
+              {newSubjectType === "PROPERTY" && (
+                <div>
+                  <label className="text-xs text-muted-foreground">
+                    Property
+                  </label>
+                  {asAdmin && !selectedUserId ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Select a user first to load their properties.
+                    </p>
+                  ) : loadingProperties ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Loading properties…
+                    </div>
+                  ) : userProperties.length === 0 ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      No posted properties found for this account.
+                    </p>
+                  ) : (
+                    <select
+                      value={newSubjectId}
+                      onChange={(e) => setNewSubjectId(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
+                    >
+                      <option value="">Select a property…</option>
+                      {userProperties.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+              {newSubjectType !== "GENERAL" &&
+                newSubjectType !== "PROPERTY" && (
                 <div>
                   <label className="text-xs text-muted-foreground">
                     Related ID ({newSubjectType})
@@ -696,7 +788,7 @@ export function MessagingInbox({ mode }: Props) {
                   <input
                     value={newSubjectId}
                     onChange={(e) => setNewSubjectId(e.target.value)}
-                    placeholder="Paste property / request ID"
+                    placeholder="Paste request ID"
                     className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm"
                   />
                 </div>
