@@ -62,6 +62,34 @@ export const ourFileRouter = {
         name: file.name,
       };
     }),
+
+  messageAttachments: f({
+    image: {
+      maxFileSize: "8MB",
+      maxFileCount: 5,
+    },
+    pdf: {
+      maxFileSize: "16MB",
+      maxFileCount: 5,
+    },
+    text: {
+      maxFileSize: "4MB",
+      maxFileCount: 3,
+    },
+  })
+    .middleware(async ({ req }) => {
+      const userId = await requireUserId(req);
+      return { userId };
+    })
+    .onUploadComplete(async ({ metadata, file }) => {
+      return {
+        uploadedBy: metadata.userId,
+        url: file.ufsUrl,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      };
+    }),
 } satisfies FileRouter;
 
 export type OurFileRouter = typeof ourFileRouter;

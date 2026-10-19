@@ -207,6 +207,21 @@ export default function AdminLayout({
                 <span className="font-medium">Requests</span>
               </Link>
 
+              {(adminUser?.role === "SUPER_ADMIN" ||
+                adminUser?.role === "CUSTOMER_SUPPORT") && (
+                <Link
+                  href="/admin/messages"
+                  className={`flex items-center py-3 px-4 rounded-lg transition-all duration-200 ${
+                    pathname.startsWith("/admin/messages")
+                      ? "bg-indigo-700/50 text-white shadow-md"
+                      : "text-slate-300 hover:bg-indigo-800/30 hover:text-white"
+                  }`}
+                >
+                  <MessageSquare size={18} className="mr-3" strokeWidth={2.5} />
+                  <span className="font-medium">Messages</span>
+                </Link>
+              )}
+
               <Link
                 href="/admin/construction"
                 className={`flex items-center py-3 px-4 rounded-lg transition-all duration-200 ${

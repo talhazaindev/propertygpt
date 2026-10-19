@@ -442,6 +442,42 @@ export async function sendAgentVerificationSuccessEmail(params: {
   });
 }
 
+export async function sendNewMessageEmail(params: {
+  to: string;
+  recipientName?: string | null;
+  inboxPath: string;
+  subjectLabel?: string | null;
+}): Promise<SendResult> {
+  const baseUrl = getAppBaseUrl();
+  const inboxUrl = `${baseUrl}${params.inboxPath.startsWith("/") ? params.inboxPath : `/${params.inboxPath}`}`;
+  const greeting = params.recipientName
+    ? `Hi ${escapeHtml(params.recipientName)},`
+    : "Hi,";
+  const about = params.subjectLabel
+    ? ` regarding <strong>${escapeHtml(params.subjectLabel)}</strong>`
+    : "";
+
+  return sendViaResend({
+    to: params.to,
+    subject: "You have a new message — Manzil",
+    html: brandedEmailShell({
+      title: "New message",
+      preheader: "You have a new message on Manzil. Open your inbox to reply.",
+      bodyHtml: `
+        <h1 style="margin:0 0 12px;font-size:26px;line-height:1.3;color:#1a3a2a;">You have a new message</h1>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">${greeting}</p>
+        <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">
+          Someone sent you a new message${about}. Open your inbox to read and reply.
+        </p>
+        ${ctaButtonHtml(inboxUrl, "Open inbox")}
+        <p style="margin:16px 0 0;font-size:13px;color:#7a7468;text-align:center;">
+          Or visit <a href="${escapeHtml(inboxUrl)}" style="color:#1a3a2a;">${escapeHtml(inboxUrl)}</a>
+        </p>
+      `,
+    }),
+  });
+}
+
 export async function sendSignupOtpEmail(params: {
   to: string;
   code: string;

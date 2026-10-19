@@ -30,6 +30,7 @@ model User {
   agentRequests  AgentRequest[]
   agentActivities AgentActivity[]
   agentTargets   AgentTarget[]
+  conversations  Conversation[]
 }
 
 enum Role {
@@ -93,6 +94,10 @@ model TeamMember {
 
   // Agent requests reviewed by this team member
   reviewedAgentRequests AgentRequest[] @relation("AgentRequestReviewedBy")
+
+  // Support conversations assigned to this team member
+  assignedConversations Conversation[] @relation("ConversationAssignedTo")
+  sentMessages          Message[]      @relation("MessageSentByStaff")
 }
 
 enum PropertyType {
@@ -386,4 +391,67 @@ model EmailOtp {
   createdAt  DateTime   @default(now())
 
   @@index([email, purpose])
+}
+
+enum ConversationSubjectType {
+  PROPERTY
+  PROPERTY_REQUEST
+  AGENT_REQUEST
+  GENERAL
+}
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+}
+
+enum MessageSenderType {
+  USER
+  STAFF
+}
+
+/// One thread per user + subject (subjectKey encodes type + id).
+model Conversation {
+  id                 String                  @id @default(auto()) @map("_id") @db.ObjectId
+  subjectType        ConversationSubjectType
+  /// Stable unique key: "GENERAL" | "PROPERTY:<id>" | "PROPERTY_REQUEST:<id>" | "AGENT_REQUEST:<id>"
+  subjectKey         String
+  subjectId          String?
+  subjectLabel       String?
+  status             ConversationStatus      @default(OPEN)
+  userId             String                  @db.ObjectId
+  user               User                    @relation(fields: [userId], references: [id])
+  assignedToId       String?                 @db.ObjectId
+  assignedTo         TeamMember?             @relation("ConversationAssignedTo", fields: [assignedToId], references: [id])
+  lastMessageAt      DateTime?
+  /// Encrypted short preview (same shared support key as message bodies).
+  lastPreviewCipher  String?
+  lastPreviewIv      String?
+  userUnreadCount    Int                     @default(0)
+  staffUnreadCount   Int                     @default(0)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  messages           Message[]
+
+  @@unique([userId, subjectKey])
+  @@index([assignedToId, status])
+  @@index([status, lastMessageAt])
+}
+
+model Message {
+  id             String            @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String            @db.ObjectId
+  conversation   Conversation     @relation(fields: [conversationId], references: [id])
+  senderType     MessageSenderType
+  senderUserId   String?           @db.ObjectId
+  senderTeamId   String?           @db.ObjectId
+  senderStaff    TeamMember?       @relation("MessageSentByStaff", fields: [senderTeamId], references: [id])
+  bodyCiphertext String
+  bodyIv         String
+  /// CDN attachment metadata (urls/names); not encrypted.
+  attachments    Json[]            @default([])
+  createdAt      DateTime          @default(now())
+  readAt         DateTime?
+
+  @@index([conversationId, createdAt])
 }

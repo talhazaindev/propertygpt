@@ -171,6 +171,14 @@ const Header = () => {
                       ? "Agent dashboard"
                       : "Dashboard"}
                   </Link>
+                  {!session?.user?.isTeamMember && (
+                    <Link
+                      href="/inbox"
+                      className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
+                    >
+                      Inbox
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={handleSignOut}
@@ -276,6 +284,15 @@ const Header = () => {
                     ? "Agent dashboard"
                     : "Dashboard"}
                 </Link>
+                {!session?.user?.isTeamMember && (
+                  <Link
+                    href="/inbox"
+                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Inbox
+                  </Link>
+                )}
                 <button type="button" onClick={handleSignOut} className="rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50">
                   Sign out
                 </button>

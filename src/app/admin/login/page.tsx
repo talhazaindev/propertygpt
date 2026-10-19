@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import axios from "axios";
+import { signIn } from "next-auth/react";
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -38,9 +39,17 @@ export default function AdminLogin() {
       });
 
       if (response.data) {
+        // Also establish NextAuth session (messaging uploads + APIs)
+        await signIn("credentials", {
+          email,
+          password,
+          redirect: false,
+        });
+
         // Save admin status and user info in localStorage
         localStorage.setItem("isAdmin", "true");
         localStorage.setItem("adminUser", JSON.stringify({
+          id: response.data.id,
           name: response.data.name,
           email: response.data.email,
           role: response.data.role

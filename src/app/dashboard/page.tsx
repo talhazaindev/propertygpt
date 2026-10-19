@@ -44,20 +44,28 @@ export default function DashboardPage() {
       }
 
       try {
-        const response = await axios.get(
-          `/api/properties?userId=${user.id}&limit=1`
-        );
+        const [propertiesRes, conversationsRes] = await Promise.all([
+          axios.get(`/api/properties?userId=${user.id}&limit=1`),
+          axios.get("/api/messages/conversations").catch(() => null),
+        ]);
         const listingsActive =
-          response.data?.pagination?.total ??
-          response.data?.total ??
-          (Array.isArray(response.data?.properties)
-            ? response.data.properties.length
+          propertiesRes.data?.pagination?.total ??
+          propertiesRes.data?.total ??
+          (Array.isArray(propertiesRes.data?.properties)
+            ? propertiesRes.data.properties.length
             : 0);
+
+        const conversations = conversationsRes?.data?.conversations || [];
+        const unread = conversations.reduce(
+          (sum: number, c: { userUnreadCount?: number }) =>
+            sum + (c.userUnreadCount || 0),
+          0
+        );
 
         setStats({
           totalViews: 0,
           savedProperties: 0,
-          messages: 0,
+          messages: unread,
           listingsActive,
         });
       } catch (error) {
@@ -100,6 +108,14 @@ export default function DashboardPage() {
       href: "/my-requests",
       color: "text-green-600",
       bgColor: "bg-green-100",
+    },
+    {
+      title: "Inbox",
+      description: "Message Manzil support about listings or requests",
+      icon: MessageSquare,
+      href: "/inbox",
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
     },
     {
       title: "Account Settings",
