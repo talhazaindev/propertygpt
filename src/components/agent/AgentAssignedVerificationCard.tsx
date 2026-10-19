@@ -94,18 +94,30 @@ export default function AgentAssignedVerificationCard({
   >([]);
   const [busy, setBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    verifiedItems?: string;
+    verificationSource?: string;
+    remarks?: string;
+    documents?: string;
+  }>({});
 
   const images = property.images || [];
   const ownerDocs = property.verificationDocuments || [];
   const alreadySubmitted = property.agentVerificationStatus === "SUBMITTED";
 
+  const showMessage = (msg: string, isError = true) => {
+    setLocalError(isError ? msg : null);
+    onMessage(msg);
+  };
+
   const addDoc = (file: File | null) => {
     if (!file || !docType) {
-      onMessage("Select a document type, then choose a file.");
+      showMessage("Select a document type, then choose a file.");
       return;
     }
     if (!isAcceptedDocumentFile(file)) {
-      onMessage("Use PDF or JPG/JPEG up to 16MB.");
+      showMessage("Use PDF or JPG/JPEG up to 16MB.");
       return;
     }
     setPendingDocs((prev) => [
@@ -113,6 +125,8 @@ export default function AgentAssignedVerificationCard({
       { type: docType, file, preview: URL.createObjectURL(file) },
     ]);
     setDocType("");
+    setFieldErrors((prev) => ({ ...prev, documents: undefined }));
+    setLocalError(null);
   };
 
   const removeDoc = (index: number) => {
@@ -127,16 +141,17 @@ export default function AgentAssignedVerificationCard({
   const markInProgress = async () => {
     try {
       setBusy(true);
+      setLocalError(null);
       await axios.patch(`/api/agents/properties/${property.id}/verify`, {
         markInProgress: true,
         remarks: remarks || "Started verification work.",
       });
-      onMessage("Marked in progress.");
+      showMessage("Marked in progress.", false);
       await onUpdated();
     } catch (err: unknown) {
-      onMessage(
+      showMessage(
         axios.isAxiosError(err) && err.response?.data?.error
-          ? err.response.data.error
+          ? String(err.response.data.error)
           : "Could not update status"
       );
     } finally {
@@ -145,22 +160,34 @@ export default function AgentAssignedVerificationCard({
   };
 
   const submitVerification = async () => {
-    if (remarks.trim().length < 10) {
-      onMessage("Add remarks (at least 10 characters).");
-      return;
-    }
+    const nextErrors: typeof fieldErrors = {};
     if (verifiedItems.trim().length < 10) {
-      onMessage("Describe what you verified.");
-      return;
+      nextErrors.verifiedItems = "Describe what you verified (at least 10 characters).";
     }
     if (verificationSource.trim().length < 5) {
-      onMessage("Tell us your source of verification.");
-      return;
+      nextErrors.verificationSource = "Tell us your source of verification.";
+    }
+    if (remarks.trim().length < 10) {
+      nextErrors.remarks = "Add remarks (at least 10 characters).";
     }
     if (pendingDocs.length === 0 && !(property.agentVerifiedDocuments?.length)) {
-      onMessage("Upload at least one verified document.");
+      nextErrors.documents = "Upload at least one verified document (PDF or JPG).";
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      const first =
+        nextErrors.verifiedItems ||
+        nextErrors.verificationSource ||
+        nextErrors.remarks ||
+        nextErrors.documents ||
+        "Please complete the required fields.";
+      showMessage(first);
       return;
     }
+
+    setFieldErrors({});
+    setLocalError(null);
 
     try {
       setBusy(true);
@@ -176,8 +203,15 @@ export default function AgentAssignedVerificationCard({
       if (pendingDocs.length > 0) {
         const results = await uploadFiles("verificationDocuments", {
           files: pendingDocs.map((d) => d.file),
-          onUploadProgress: ({ totalProgress }) => {
-            setUploadProgress(Math.min(80, Math.round(totalProgress * 0.8)));
+          onUploadProgress: (progress) => {
+            const total =
+              typeof progress === "number"
+                ? progress
+                : (progress as { totalProgress?: number; progress?: number })
+                    .totalProgress ??
+                  (progress as { progress?: number }).progress ??
+                  0;
+            setUploadProgress(Math.min(80, Math.round(Number(total) * 0.8)));
           },
         });
 
@@ -202,16 +236,22 @@ export default function AgentAssignedVerificationCard({
         documents,
       });
       setUploadProgress(100);
-      onMessage("Verification submitted. Admin will do the final review.");
+      showMessage("Verification submitted. Admin will do the final review.", false);
       setPendingDocs([]);
       await onUpdated();
     } catch (err: unknown) {
-      onMessage(
-        axios.isAxiosError(err) && err.response?.data?.error
-          ? err.response.data.error
+      const apiError =
+        axios.isAxiosError(err) && err.response?.data
+          ? err.response.data.error ||
+            err.response.data.issues?.[0]?.message ||
+            null
+          : null;
+      showMessage(
+        typeof apiError === "string"
+          ? apiError
           : err instanceof Error
             ? err.message
-            : "Submit failed"
+            : "Submit failed. Please try again."
       );
     } finally {
       setBusy(false);
@@ -405,10 +445,27 @@ export default function AgentAssignedVerificationCard({
               <textarea
                 rows={2}
                 value={verifiedItems}
-                onChange={(e) => setVerifiedItems(e.target.value)}
+                onChange={(e) => {
+                  setVerifiedItems(e.target.value);
+                  if (fieldErrors.verifiedItems) {
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      verifiedItems: undefined,
+                    }));
+                  }
+                }}
                 placeholder="e.g. Ownership title, mutation, physical possession, plot dimensions…"
-                className="w-full rounded-xl border border-[#dbe0d6] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#195b3b] focus:ring-2 focus:ring-[#195b3b]/15"
+                className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#195b3b]/15 ${
+                  fieldErrors.verifiedItems
+                    ? "border-rose-400 focus:border-rose-500"
+                    : "border-[#dbe0d6] focus:border-[#195b3b]"
+                }`}
               />
+              {fieldErrors.verifiedItems && (
+                <p className="mt-1 text-sm text-rose-600">
+                  {fieldErrors.verifiedItems}
+                </p>
+              )}
             </div>
 
             <div>
@@ -417,10 +474,27 @@ export default function AgentAssignedVerificationCard({
               </label>
               <input
                 value={verificationSource}
-                onChange={(e) => setVerificationSource(e.target.value)}
+                onChange={(e) => {
+                  setVerificationSource(e.target.value);
+                  if (fieldErrors.verificationSource) {
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      verificationSource: undefined,
+                    }));
+                  }
+                }}
                 placeholder="e.g. Registrar office visit, society office, NADRA check, seller interview…"
-                className="w-full rounded-xl border border-[#dbe0d6] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#195b3b] focus:ring-2 focus:ring-[#195b3b]/15"
+                className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#195b3b]/15 ${
+                  fieldErrors.verificationSource
+                    ? "border-rose-400 focus:border-rose-500"
+                    : "border-[#dbe0d6] focus:border-[#195b3b]"
+                }`}
               />
+              {fieldErrors.verificationSource && (
+                <p className="mt-1 text-sm text-rose-600">
+                  {fieldErrors.verificationSource}
+                </p>
+              )}
             </div>
 
             <div>
@@ -430,23 +504,45 @@ export default function AgentAssignedVerificationCard({
               <textarea
                 rows={3}
                 value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
+                onChange={(e) => {
+                  setRemarks(e.target.value);
+                  if (fieldErrors.remarks) {
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      remarks: undefined,
+                    }));
+                  }
+                }}
                 placeholder="Detailed findings, red flags, recommendations for Manzil…"
-                className="w-full rounded-xl border border-[#dbe0d6] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#195b3b] focus:ring-2 focus:ring-[#195b3b]/15"
+                className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#195b3b]/15 ${
+                  fieldErrors.remarks
+                    ? "border-rose-400 focus:border-rose-500"
+                    : "border-[#dbe0d6] focus:border-[#195b3b]"
+                }`}
               />
+              {fieldErrors.remarks && (
+                <p className="mt-1 text-sm text-rose-600">{fieldErrors.remarks}</p>
+              )}
             </div>
 
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5c6b61]">
                 Upload verified documents
               </label>
+              <p className="mb-2 text-xs text-[#5c6b61]">
+                Required: choose a document type, then add a PDF or JPG (max 16MB).
+              </p>
               <div className="flex flex-wrap gap-2">
                 <select
                   value={docType}
                   onChange={(e) =>
                     setDocType(e.target.value as VerificationDocumentType | "")
                   }
-                  className="rounded-xl border border-[#dbe0d6] bg-white px-3 py-2 text-sm"
+                  className={`rounded-xl border bg-white px-3 py-2 text-sm ${
+                    fieldErrors.documents
+                      ? "border-rose-400"
+                      : "border-[#dbe0d6]"
+                  }`}
                 >
                   <option value="">Document type…</option>
                   {verificationDocumentTypes.map((t) => (
@@ -469,6 +565,11 @@ export default function AgentAssignedVerificationCard({
                   />
                 </label>
               </div>
+              {fieldErrors.documents && (
+                <p className="mt-1 text-sm text-rose-600">
+                  {fieldErrors.documents}
+                </p>
+              )}
               {pendingDocs.length > 0 && (
                 <ul className="mt-2 space-y-1.5">
                   {pendingDocs.map((doc, i) => (
@@ -506,6 +607,15 @@ export default function AgentAssignedVerificationCard({
               </div>
             )}
 
+            {localError && (
+              <div
+                role="alert"
+                className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-sm font-medium text-rose-800"
+              >
+                {localError}
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="button"
@@ -518,11 +628,13 @@ export default function AgentAssignedVerificationCard({
               <button
                 type="button"
                 disabled={busy}
-                onClick={submitVerification}
+                onClick={() => {
+                  void submitVerification();
+                }}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#195b3b] to-[#2a7a52] px-4 py-2.5 text-sm font-semibold text-[#faf8f3] disabled:opacity-60"
               >
                 {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-                Submit verification
+                {busy ? "Submitting…" : "Submit verification"}
               </button>
             </div>
           </div>

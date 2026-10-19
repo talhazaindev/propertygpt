@@ -43,12 +43,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: "Property not found" }, { status: 404 });
       }
 
-      const assignedId =
-        property.assignedAgentId?.toString?.() || property.assignedAgentId;
-      if (assignedId !== session.user.id) {
+      const assignedId = String(property.assignedAgentId ?? "");
+      if (!assignedId || assignedId !== session.user.id) {
         return NextResponse.json(
           { error: "This property is not assigned to you" },
           { status: 403 }
+        );
+      }
+
+      const currentStatus = property.agentVerificationStatus;
+      if (currentStatus === "SUBMITTED" || currentStatus === "COMPLETED") {
+        return NextResponse.json(
+          { error: "Verification already submitted for this property" },
+          { status: 400 }
         );
       }
 
@@ -81,8 +88,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const validation = agentPropertyVerificationSchema.safeParse(body);
     if (!validation.success) {
+      const firstIssue = validation.error.issues[0];
       return NextResponse.json(
-        { error: "Invalid input", issues: validation.error.issues },
+        {
+          error: firstIssue?.message || "Invalid input",
+          issues: validation.error.issues,
+        },
         { status: 400 }
       );
     }
@@ -100,12 +111,18 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Property not found" }, { status: 404 });
     }
 
-    const assignedId =
-      property.assignedAgentId?.toString?.() || property.assignedAgentId;
-    if (assignedId !== session.user.id) {
+    const assignedId = String(property.assignedAgentId ?? "");
+    if (!assignedId || assignedId !== session.user.id) {
       return NextResponse.json(
         { error: "This property is not assigned to you" },
         { status: 403 }
+      );
+    }
+
+    if (property.agentVerificationStatus === "COMPLETED") {
+      return NextResponse.json(
+        { error: "This verification is already completed by Manzil" },
+        { status: 400 }
       );
     }
 

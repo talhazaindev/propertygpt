@@ -93,7 +93,8 @@ export const agentPropertyVerificationSchema = z.object({
     .array(
       z.object({
         type: z.string().min(1),
-        url: z.string().url(),
+        // Match property uploads: accept UploadThing CDN URLs without strict URL parsing
+        url: z.string().min(1, { message: "Document URL is required" }),
         fileName: z.string().min(1),
       })
     )

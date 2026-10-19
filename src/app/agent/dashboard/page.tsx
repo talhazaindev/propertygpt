@@ -144,9 +144,9 @@ function AgentDashboardInner() {
 
   const selectedType = watch("type");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { quiet?: boolean }) => {
     try {
-      setLoading(true);
+      if (!opts?.quiet) setLoading(true);
       setError(null);
       const res = await axios.get("/api/agents/dashboard");
       setData(res.data);
@@ -157,12 +157,14 @@ function AgentDashboardInner() {
           : "Failed to load dashboard"
       );
     } finally {
-      setLoading(false);
+      if (!opts?.quiet) setLoading(false);
     }
   }, []);
 
+  const refreshQuietly = useCallback(() => load({ quiet: true }), [load]);
+
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const onSubmitRequest = async (form: AgentRequestCreateValues) => {
@@ -564,7 +566,7 @@ function AgentDashboardInner() {
                       <AgentAssignedVerificationCard
                         key={prop.id}
                         property={prop}
-                        onUpdated={load}
+                        onUpdated={refreshQuietly}
                         onMessage={setSubmitMsg}
                       />
                     ))}
