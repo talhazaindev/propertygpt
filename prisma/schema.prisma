@@ -369,3 +369,21 @@ model AgentTarget {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }
+
+enum OtpPurpose {
+  SIGNUP
+  AGENT_SIGNUP
+}
+
+model EmailOtp {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  email      String
+  purpose    OtpPurpose
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int        @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([email, purpose])
+}

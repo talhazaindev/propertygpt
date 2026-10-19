@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import prisma from "@/lib/prismadb";
 import { agentApplySchema } from "@/schemas/agent";
 import { computeTrustScore } from "@/lib/agent-trust";
+import { normalizeEmail, verifySignupToken } from "@/lib/otp";
 
 export async function POST(request: Request) {
   try {
@@ -18,13 +19,19 @@ export async function POST(request: Request) {
 
     const {
       name,
-      email,
       password,
       phoneNumber,
       businessName,
       location,
       businessAddress,
+      signupToken,
     } = validation.data;
+    const email = normalizeEmail(validation.data.email);
+
+    const tokenCheck = verifySignupToken(signupToken, email, "AGENT_SIGNUP");
+    if (!tokenCheck.ok) {
+      return NextResponse.json({ error: tokenCheck.error }, { status: 403 });
+    }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -51,6 +58,7 @@ export async function POST(request: Request) {
         hashedPassword,
         phoneNumber,
         role: "AGENT",
+        emailVerified: now,
         agentProfile: {
           create: {
             businessName,

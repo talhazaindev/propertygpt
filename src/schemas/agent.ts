@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const agentApplySchema = z.object({
+export const agentApplyFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   businessName: z.string().min(2, { message: "Business name is required" }),
   location: z.string().min(2, { message: "Location is required" }),
@@ -15,6 +15,10 @@ export const agentApplySchema = z.object({
     .regex(/[a-z]/, { message: "Password must contain at least one lowercase letter" })
     .regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter" })
     .regex(/[0-9]/, { message: "Password must contain at least one number" }),
+});
+
+export const agentApplySchema = agentApplyFormSchema.extend({
+  signupToken: z.string().min(1, { message: "Email verification is required" }),
 });
 
 export const agentRequestCreateSchema = z.object({
@@ -99,7 +103,8 @@ export const agentPropertyVerificationSchema = z.object({
   notes: z.string().optional(),
 });
 
-export type AgentApplyFormValues = z.infer<typeof agentApplySchema>;
+export type AgentApplyFormValues = z.infer<typeof agentApplyFormSchema>;
+export type AgentApplyPayload = z.infer<typeof agentApplySchema>;
 export type AgentRequestCreateValues = z.infer<typeof agentRequestCreateSchema>;
 export type AgentTargetFormValues = z.infer<typeof agentTargetSchema>;
 export type AgentPropertyVerificationValues = z.infer<

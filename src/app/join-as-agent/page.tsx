@@ -7,12 +7,17 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import axios from "axios";
-import { agentApplySchema, AgentApplyFormValues } from "@/schemas/agent";
+import { agentApplyFormSchema, AgentApplyFormValues } from "@/schemas/agent";
+import { EmailOtpStep } from "@/components/auth/EmailOtpStep";
 import { Loader2 } from "lucide-react";
+
+type Step = "details" | "otp";
 
 export default function JoinAsAgentPage() {
   const router = useRouter();
   const { status } = useSession();
+  const [step, setStep] = useState<Step>("details");
+  const [pendingData, setPendingData] = useState<AgentApplyFormValues | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -22,7 +27,7 @@ export default function JoinAsAgentPage() {
     handleSubmit,
     formState: { errors },
   } = useForm<AgentApplyFormValues>({
-    resolver: zodResolver(agentApplySchema),
+    resolver: zodResolver(agentApplyFormSchema),
     defaultValues: {
       name: "",
       businessName: "",
@@ -40,11 +45,19 @@ export default function JoinAsAgentPage() {
     }
   }, [status, router]);
 
-  const onSubmit = async (data: AgentApplyFormValues) => {
+  const onDetailsSubmit = (data: AgentApplyFormValues) => {
+    setError(null);
+    setPendingData(data);
+    setStep("otp");
+  };
+
+  const onOtpVerified = async (signupToken: string) => {
+    if (!pendingData) return;
+
     try {
       setLoading(true);
       setError(null);
-      await axios.post("/api/agents/apply", data);
+      await axios.post("/api/agents/apply", { ...pendingData, signupToken });
       setSuccess(true);
     } catch (err: unknown) {
       const message =
@@ -65,9 +78,9 @@ export default function JoinAsAgentPage() {
             Application received
           </h1>
           <p className="mt-4 text-muted-foreground">
-            Thank you for applying to join the Manzil agent network. Our team will
-            review your details. Once approved, you will receive an activation email
-            and can sign in to your agent account.
+            Thank you for applying to join the Manzil agent network. Our team will review your
+            details. Once approved, you will receive an activation email and can sign in to your
+            agent account.
           </p>
           <Link
             href="/login"
@@ -91,9 +104,8 @@ export default function JoinAsAgentPage() {
             Join our team as an agent
           </h1>
           <p className="text-lg text-muted-foreground">
-            Exclusive benefits, access to unlimited clients and properties, and a
-            community you can rely on — while you remain the owner of your own
-            business.
+            Exclusive benefits, access to unlimited clients and properties, and a community you can
+            rely on — while you remain the owner of your own business.
           </p>
           <ul className="space-y-3 text-sm text-foreground/90">
             <li>Build a public Agent Trust Profile — not vanity stars</li>
@@ -103,95 +115,115 @@ export default function JoinAsAgentPage() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-          <h2 className="text-xl font-semibold text-foreground">Agent application</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Tell us about you and your business. Access unlocks after verification.
-          </p>
-
-          {error && (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
-          <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Full name" error={errors.name?.message}>
-                <input
-                  {...register("name")}
-                  className={inputClass(!!errors.name)}
-                  placeholder="Your name"
-                />
-              </Field>
-              <Field label="Business name" error={errors.businessName?.message}>
-                <input
-                  {...register("businessName")}
-                  className={inputClass(!!errors.businessName)}
-                  placeholder="Agency / office name"
-                />
-              </Field>
-            </div>
-
-            <Field label="Location" error={errors.location?.message}>
-              <input
-                {...register("location")}
-                className={inputClass(!!errors.location)}
-                placeholder="City / area"
-              />
-            </Field>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Email" error={errors.email?.message}>
-                <input
-                  type="email"
-                  {...register("email")}
-                  className={inputClass(!!errors.email)}
-                  placeholder="you@agency.com"
-                />
-              </Field>
-              <Field label="Phone" error={errors.phoneNumber?.message}>
-                <input
-                  {...register("phoneNumber")}
-                  className={inputClass(!!errors.phoneNumber)}
-                  placeholder="03XXXXXXXXX"
-                />
-              </Field>
-            </div>
-
-            <Field label="Business address" error={errors.businessAddress?.message}>
-              <textarea
-                {...register("businessAddress")}
-                rows={2}
-                className={inputClass(!!errors.businessAddress)}
-                placeholder="Office street address"
-              />
-            </Field>
-
-            <Field label="Password" error={errors.password?.message}>
-              <input
-                type="password"
-                {...register("password")}
-                className={inputClass(!!errors.password)}
-                placeholder="Create a password"
-                autoComplete="new-password"
-              />
-            </Field>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                "Submit application"
+          {step === "otp" && pendingData ? (
+            <>
+              {error && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
+                </div>
               )}
-            </button>
-          </form>
+              {loading ? (
+                <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <p className="text-sm">Submitting your application...</p>
+                </div>
+              ) : (
+                <EmailOtpStep
+                  email={pendingData.email}
+                  purpose="AGENT_SIGNUP"
+                  onVerified={(token) => void onOtpVerified(token)}
+                  onBack={() => {
+                    setStep("details");
+                    setError(null);
+                  }}
+                />
+              )}
+            </>
+          ) : (
+            <>
+              <h2 className="text-xl font-semibold text-foreground">Agent application</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Tell us about you and your business. We will verify your email before submitting.
+              </p>
+
+              {error && (
+                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <form className="mt-6 space-y-4" onSubmit={handleSubmit(onDetailsSubmit)}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Full name" error={errors.name?.message}>
+                    <input
+                      {...register("name")}
+                      className={inputClass(!!errors.name)}
+                      placeholder="Your name"
+                    />
+                  </Field>
+                  <Field label="Business name" error={errors.businessName?.message}>
+                    <input
+                      {...register("businessName")}
+                      className={inputClass(!!errors.businessName)}
+                      placeholder="Agency / office name"
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Location" error={errors.location?.message}>
+                  <input
+                    {...register("location")}
+                    className={inputClass(!!errors.location)}
+                    placeholder="City / area"
+                  />
+                </Field>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Email" error={errors.email?.message}>
+                    <input
+                      type="email"
+                      {...register("email")}
+                      className={inputClass(!!errors.email)}
+                      placeholder="you@agency.com"
+                    />
+                  </Field>
+                  <Field label="Phone" error={errors.phoneNumber?.message}>
+                    <input
+                      {...register("phoneNumber")}
+                      className={inputClass(!!errors.phoneNumber)}
+                      placeholder="03XXXXXXXXX"
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Business address" error={errors.businessAddress?.message}>
+                  <textarea
+                    {...register("businessAddress")}
+                    rows={2}
+                    className={inputClass(!!errors.businessAddress)}
+                    placeholder="Office street address"
+                  />
+                </Field>
+
+                <Field label="Password" error={errors.password?.message}>
+                  <input
+                    type="password"
+                    {...register("password")}
+                    className={inputClass(!!errors.password)}
+                    placeholder="Create a password"
+                    autoComplete="new-password"
+                  />
+                </Field>
+
+                <button
+                  type="submit"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+                >
+                  Continue to email verification
+                </button>
+              </form>
+            </>
+          )}
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Already an agent?{" "}

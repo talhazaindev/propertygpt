@@ -1,94 +1,76 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import { registerSchema } from "@/schemas/auth";
-import clientPromise from "@/lib/mongodb";
 import prisma from "@/lib/prismadb";
+import { normalizeEmail, verifySignupToken } from "@/lib/otp";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    
-    // Validate the request body using Zod schema
     const validation = registerSchema.safeParse(body);
-    
+
     if (!validation.success) {
       return NextResponse.json(
         { error: "Invalid input data", issues: validation.error.issues },
         { status: 400 }
       );
     }
-    
-    const { name, email, password, phoneNumber } = validation.data;
-    
-    // Connect to MongoDB directly
-    const client = await clientPromise;
-    const db = client.db();
-    const usersCollection = db.collection('User');
-    
-    // Check if user already exists
-    const existingUser = await usersCollection.findOne({ email });
-    
-    if (existingUser) {
-      return NextResponse.json(
-        { error: "Email already in use" },
-        { status: 409 }
-      );
+
+    const { name, password, signupToken } = validation.data;
+    const email = normalizeEmail(validation.data.email);
+    const phoneNumber = validation.data.phoneNumber || undefined;
+
+    const tokenCheck = verifySignupToken(signupToken, email, "SIGNUP");
+    if (!tokenCheck.ok) {
+      return NextResponse.json({ error: tokenCheck.error }, { status: 403 });
     }
-    
-    // Hash the password
+
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 12);
-    
-    try {
-      // Create user document directly in MongoDB
-      const now = new Date();
-      const result = await usersCollection.insertOne({
+    const now = new Date();
+
+    const user = await prisma.user.create({
+      data: {
         name,
         email,
         hashedPassword,
         phoneNumber,
         role: "BUYER",
-        createdAt: now,
-        updatedAt: now,
-      });
-      
-      if (!result.acknowledged) {
-        throw new Error("Failed to insert user");
-      }
-      
-      // Return the user without sensitive data
-      const safeUser = {
-        id: result.insertedId.toString(),
-        name,
-        email,
-        phoneNumber,
-        role: "BUYER",
-        createdAt: now,
-        updatedAt: now,
-      };
-      
-      return NextResponse.json(
-        { user: safeUser, message: "User registered successfully" },
-        { status: 201 }
-      );
-    } catch (createError: any) {
-      console.error("Error creating user:", createError);
-      
-      // Handle duplicate key error (code 11000)
-      if (createError.code === 11000) {
-        return NextResponse.json(
-          { error: "Email already in use" },
-          { status: 409 }
-        );
-      }
-      
-      throw createError; // Re-throw if it's not a handled error
-    }
-    
-  } catch (error) {
-    console.error("[REGISTRATION_ERROR]", error);
+        emailVerified: now,
+      },
+    });
+
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          role: user.role,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
+        message: "User registered successfully",
+      },
+      { status: 201 }
     );
+  } catch (error: unknown) {
+    console.error("[REGISTRATION_ERROR]", error);
+
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "P2002"
+    ) {
+      return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+    }
+
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-} 
+}

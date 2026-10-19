@@ -4,7 +4,7 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import axios from "axios";
-import { RegisterFormValues, LoginFormValues } from "@/schemas/auth";
+import { RegisterFormValues, RegisterPayload, LoginFormValues } from "@/schemas/auth";
 
 export const useAuth = () => {
   const { data: session, status } = useSession();
@@ -18,12 +18,16 @@ export const useAuth = () => {
   /**
    * Register a new user
    */
-  const register = async (data: RegisterFormValues) => {
+  const register = async (data: RegisterFormValues & { signupToken: string }) => {
     try {
       setLoading(true);
       setError(null);
-      
-      const response = await axios.post('/api/register', data);
+
+      const payload: RegisterPayload = {
+        ...data,
+        phoneNumber: data.phoneNumber || undefined,
+      };
+      const response = await axios.post("/api/register", payload);
       
       return {
         success: true,
