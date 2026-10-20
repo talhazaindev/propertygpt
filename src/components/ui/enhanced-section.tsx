@@ -19,7 +19,7 @@ export function EnhancedSection({
   padding = 'lg',
   fullHeight = false,
   centerContent = false,
-  animate = true,
+  animate = false,
   id
 }: EnhancedSectionProps) {
   const backgroundClasses = {

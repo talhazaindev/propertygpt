@@ -64,7 +64,6 @@ export function EnhancedCard({
         paddingClasses[padding],
         isClickable && 'cursor-pointer group',
         disabled && 'opacity-50 cursor-not-allowed',
-        'reveal',
         className
       )}
       onClick={isClickable ? onClick : undefined}

@@ -2,35 +2,42 @@
 
 import { useEffect } from "react";
 
+/**
+ * Scroll-reveal helper. Uses data-revealed (not classList) so React-owned
+ * className props are never mutated — mutating class caused hydration mismatches
+ * with Suspense/useSearchParams pages.
+ */
 export default function ClientAnimations() {
   useEffect(() => {
     let ticking = false;
 
-    function handleScrollAnimation() {
+    function revealVisibleElements() {
       if (ticking) return;
       ticking = true;
 
       requestAnimationFrame(() => {
-        const reveals = document.querySelectorAll('[data-animate="true"], .reveal');
-        const windowHeight = window.innerHeight;
-        const elementVisible = 150;
+        const reveals = document.querySelectorAll(
+          ".reveal:not([data-revealed]), .reveal-stagger:not([data-revealed])"
+        );
+        const threshold = window.innerHeight - 150;
 
-        for (let i = 0; i < reveals.length; i++) {
-          const elementTop = reveals[i].getBoundingClientRect().top;
-          if (elementTop < windowHeight - elementVisible) {
-            reveals[i].classList.add("active");
+        reveals.forEach((el) => {
+          if (el.getBoundingClientRect().top < threshold) {
+            el.setAttribute("data-revealed", "");
           }
-        }
+        });
 
         ticking = false;
       });
     }
 
-    handleScrollAnimation();
-    window.addEventListener("scroll", handleScrollAnimation, { passive: true });
+    // Defer past hydration of Suspense boundaries that mount after first paint
+    const startId = window.setTimeout(revealVisibleElements, 0);
+    window.addEventListener("scroll", revealVisibleElements, { passive: true });
 
     return () => {
-      window.removeEventListener("scroll", handleScrollAnimation);
+      window.clearTimeout(startId);
+      window.removeEventListener("scroll", revealVisibleElements);
     };
   }, []);
 

@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { EnhancedSection } from '@/components/ui/enhanced-section';
 import { EnhancedCard } from '@/components/ui/enhanced-card';
 import { EnhancedButton } from '@/components/ui/enhanced-button';
-import { Search, Filter, SlidersHorizontal, Grid, List, ChevronLeft, ChevronRight, MapPin, Home, DollarSign, Bed, Bath, Square } from 'lucide-react';
+import { Search, SlidersHorizontal, Grid, List, ChevronLeft, ChevronRight, MapPin, Home, DollarSign, Bed, Bath, Square } from 'lucide-react';
 
 interface Property {
   id: string;
@@ -55,7 +55,6 @@ function PropertiesPageContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [cities, setCities] = useState<{id: string, name: string}[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [showFilters, setShowFilters] = useState(false);
   
   // Filter states
   const [cityId, setCityId] = useState(searchParams.get('cityId') || '');
@@ -191,29 +190,20 @@ function PropertiesPageContent() {
         ]}
         background="gradient"
         actions={
-          <div className="flex gap-3">
-            <EnhancedButton
-              variant="glass"
-              icon={viewMode === 'grid' ? List : Grid}
-              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-            >
-              {viewMode === 'grid' ? 'List View' : 'Grid View'}
-            </EnhancedButton>
-            <EnhancedButton
-              variant="glass"
-              icon={Filter}
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              Filters
-            </EnhancedButton>
-          </div>
+          <EnhancedButton
+            variant="glass"
+            icon={viewMode === 'grid' ? List : Grid}
+            onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+          >
+            {viewMode === 'grid' ? 'List View' : 'Grid View'}
+          </EnhancedButton>
         }
       />
 
       <EnhancedSection padding="lg" background="gray">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Enhanced Filters Sidebar */}
-          <div className={`lg:w-80 transition-all duration-300 ${showFilters ? 'block' : 'hidden lg:block'}`}>
+          <div className="lg:w-80">
             <EnhancedCard variant="luxury" className="sticky top-8">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold flex items-center">
