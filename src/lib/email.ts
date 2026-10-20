@@ -478,6 +478,48 @@ export async function sendNewMessageEmail(params: {
   });
 }
 
+/** Password reset: OTP code + one-click reset link. */
+export async function sendPasswordResetEmail(params: {
+  to: string;
+  name: string;
+  code: string;
+  resetToken: string;
+  expiresInMinutes: number;
+}): Promise<SendResult> {
+  const baseUrl = getAppBaseUrl();
+  const resetUrl = `${baseUrl}/reset-password?email=${encodeURIComponent(params.to)}&token=${encodeURIComponent(params.resetToken)}`;
+  const safeName = escapeHtml(params.name || "there");
+
+  return sendViaResend(
+    {
+      to: params.to,
+      subject: `${params.code} is your Manzil password reset code`,
+      html: brandedEmailShell({
+        title: "Reset your password",
+        preheader: "Use the link or code to reset your Manzil password.",
+        bodyHtml: `
+          <h1 style="margin:0 0 12px;font-size:26px;line-height:1.3;color:#1a3a2a;">Reset your password</h1>
+          <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">Hi ${safeName},</p>
+          <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">
+            We received a request to reset your Manzil account password. Choose either option below.
+          </p>
+          ${ctaButtonHtml(resetUrl, "Reset password with link")}
+          <p style="margin:24px 0 8px;font-size:14px;letter-spacing:0.08em;text-transform:uppercase;color:#1a3a2a;font-weight:bold;text-align:center;">
+            Or use this code
+          </p>
+          <p style="margin:0 0 12px;font-size:36px;letter-spacing:10px;font-weight:bold;text-align:center;color:#1a3a2a;">
+            ${escapeHtml(params.code)}
+          </p>
+          <p style="margin:0;font-size:13px;color:#7a7468;text-align:center;">
+            This link and code expire in ${params.expiresInMinutes} minutes. If you did not request a reset, you can ignore this email.
+          </p>
+        `,
+      }),
+    },
+    { required: true }
+  );
+}
+
 export async function sendSignupOtpEmail(params: {
   to: string;
   code: string;

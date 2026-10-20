@@ -378,6 +378,7 @@ model AgentTarget {
 enum OtpPurpose {
   SIGNUP
   AGENT_SIGNUP
+  PASSWORD_RESET
 }
 
 model EmailOtp {

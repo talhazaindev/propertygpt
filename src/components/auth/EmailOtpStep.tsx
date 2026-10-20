@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { Loader2 } from "lucide-react";
 
-type OtpPurpose = "SIGNUP" | "AGENT_SIGNUP";
+type OtpPurpose = "SIGNUP" | "AGENT_SIGNUP" | "PASSWORD_RESET";
 
 type EmailOtpStepProps = {
   email: string;
