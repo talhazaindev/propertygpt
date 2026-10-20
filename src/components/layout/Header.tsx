@@ -13,6 +13,7 @@ import {
   HardHat,
   BookOpen,
   Handshake,
+  Inbox,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -29,6 +30,11 @@ const Header = () => {
 
   const isAuthenticated = status === "authenticated";
   const isHomePage = pathname === "/";
+  const showInbox =
+    isAuthenticated && !session?.user?.isTeamMember;
+
+  const inboxLinkClass =
+    "inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-muted hover:text-primary";
 
   useEffect(() => {
     let ticking = false;
@@ -134,61 +140,65 @@ const Header = () => {
               Sign in
             </Link>
           ) : (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
-              >
-                {session?.user?.image ? (
-                  <Image
-                    src={session.user.image}
-                    alt={session.user.name || "User"}
-                    width={28}
-                    height={28}
-                    className="rounded-full"
-                  />
-                ) : (
-                  <UserCircle className="h-6 w-6 text-muted-foreground" />
-                )}
-                <span className="max-w-[100px] truncate">{session?.user?.name || "Account"}</span>
-              </button>
-              {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 rounded-xl border border-border bg-card py-2 shadow-lg">
-                  <div className="border-b border-border px-4 py-2">
-                    <p className="text-sm font-medium text-foreground">{session?.user?.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{session?.user?.email}</p>
-                  </div>
-                  <Link
-                    href={
-                      session?.user?.role === "AGENT"
-                        ? "/agent/dashboard"
-                        : "/dashboard"
-                    }
-                    className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
-                  >
-                    {session?.user?.role === "AGENT"
-                      ? "Agent dashboard"
-                      : "Dashboard"}
-                  </Link>
-                  {!session?.user?.isTeamMember && (
+            <>
+              {showInbox && (
+                <Link
+                  href="/inbox"
+                  className={inboxLinkClass}
+                  aria-label="Inbox"
+                  title="Inbox"
+                >
+                  <Inbox className="h-5 w-5" />
+                </Link>
+              )}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+                >
+                  {session?.user?.image ? (
+                    <Image
+                      src={session.user.image}
+                      alt={session.user.name || "User"}
+                      width={28}
+                      height={28}
+                      className="rounded-full"
+                    />
+                  ) : (
+                    <UserCircle className="h-6 w-6 text-muted-foreground" />
+                  )}
+                  <span className="max-w-[100px] truncate">{session?.user?.name || "Account"}</span>
+                </button>
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-xl border border-border bg-card py-2 shadow-lg">
+                    <div className="border-b border-border px-4 py-2">
+                      <p className="text-sm font-medium text-foreground">{session?.user?.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{session?.user?.email}</p>
+                    </div>
                     <Link
-                      href="/inbox"
+                      href={
+                        session?.user?.role === "AGENT"
+                          ? "/agent/dashboard"
+                          : "/dashboard"
+                      }
                       className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
                     >
-                      Inbox
+                      {session?.user?.role === "AGENT"
+                        ? "Agent dashboard"
+                        : "Dashboard"}
                     </Link>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleSignOut}
-                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              )}
-            </div>
+                    <button
+                      type="button"
+                      onClick={handleSignOut}
+                      className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
           <Link
             href="/sell"
@@ -204,15 +214,27 @@ const Header = () => {
           </Link>
         </div>
 
-        <button
-          type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-muted lg:hidden"
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          aria-label="Toggle menu"
-          aria-expanded={isMenuOpen}
-        >
-          {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="flex items-center gap-2 lg:hidden">
+          {showInbox && (
+            <Link
+              href="/inbox"
+              className={inboxLinkClass}
+              aria-label="Inbox"
+              title="Inbox"
+            >
+              <Inbox className="h-5 w-5" />
+            </Link>
+          )}
+          <button
+            type="button"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-muted"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label="Toggle menu"
+            aria-expanded={isMenuOpen}
+          >
+            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {isMenuOpen && (
@@ -284,15 +306,6 @@ const Header = () => {
                     ? "Agent dashboard"
                     : "Dashboard"}
                 </Link>
-                {!session?.user?.isTeamMember && (
-                  <Link
-                    href="/inbox"
-                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Inbox
-                  </Link>
-                )}
                 <button type="button" onClick={handleSignOut} className="rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50">
                   Sign out
                 </button>
