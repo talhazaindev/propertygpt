@@ -181,7 +181,7 @@ function PropertiesPageContent() {
   }, [cityId, type, minPrice, maxPrice, bedrooms, sortBy, searchTerm]);
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20">
+    <div className="min-h-screen bg-gray-50">
       {/* Enhanced Page Header */}
       <PageHeader
         title="Explore Properties"
