@@ -11,14 +11,16 @@ export async function loginWithPassword(input: {
   email: string;
   password: string;
 }): Promise<MobileLoginResponse> {
+  const platform =
+    Platform.OS === "ios" || Platform.OS === "android" ? Platform.OS : "unknown";
+
   const { data } = await apiClient.post<MobileLoginResponse>(
     "/api/auth/mobile/login",
     {
       email: input.email.trim().toLowerCase(),
       password: input.password,
-      platform:
-        Platform.OS === "ios" || Platform.OS === "android" ? Platform.OS : "unknown",
-      deviceName: Platform.OS,
+      platform,
+      deviceName: `${platform}-expo`,
     }
   );
 

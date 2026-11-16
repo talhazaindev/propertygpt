@@ -96,17 +96,36 @@ export type ApiErrorBody = {
   error?: string;
   message?: string;
   code?: string;
+  details?: Array<{ message?: string; path?: Array<string | number> }>;
 };
 
 export function getApiErrorMessage(error: unknown, fallback = "Something went wrong"): string {
   if (axios.isAxiosError(error)) {
-    const data = error.response?.data as ApiErrorBody | undefined;
-    if (data?.error || data?.message) {
-      return data.error || data.message || fallback;
+    const data = error.response?.data as ApiErrorBody | string | undefined;
+
+    if (typeof data === "string" && data.trim()) {
+      return data.replace(/<[^>]+>/g, " ").trim().slice(0, 180);
     }
+
+    if (data && typeof data === "object") {
+      if (data.error || data.message) {
+        return data.error || data.message || fallback;
+      }
+      const detail = data.details?.[0]?.message;
+      if (detail) return detail;
+    }
+
     if (!error.response) {
       return `Cannot reach API at ${API_BASE_URL}. Is the backend running?`;
     }
+
+    if (error.response.status === 401) {
+      return "Invalid email or password";
+    }
+    if (error.response.status === 400) {
+      return "Invalid login details. Check your email and try again.";
+    }
+
     return error.message || fallback;
   }
   if (error instanceof Error) {
