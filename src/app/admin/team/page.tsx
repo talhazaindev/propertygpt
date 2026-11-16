@@ -84,11 +84,7 @@ export default function TeamManagementPage() {
         url += `&query=${encodeURIComponent(query)}`;
       }
       
-      const response = await fetch(url, {
-        headers: {
-          'x-admin-auth': 'true'
-        }
-      });
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Failed to fetch team members');
       }
@@ -139,10 +135,7 @@ export default function TeamManagementPage() {
     if (confirm("Are you sure you want to delete this team member?")) {
       try {
         const response = await fetch(`/api/admin/team/${id}`, {
-          method: "DELETE",
-          headers: {
-            'x-admin-auth': 'true'
-          }
+          method: "DELETE"
         });
         
         if (!response.ok) {
@@ -164,7 +157,6 @@ export default function TeamManagementPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          'x-admin-auth': 'true'
         },
         body: JSON.stringify({ isActive: !currentStatus }),
       });

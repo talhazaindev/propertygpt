@@ -1,49 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
 import { ObjectId } from "mongodb";
 import { connectDB } from "@/lib/mongodb";
 import { updateConstructionStatusSchema } from "@/schemas/construction";
-import { authOptions } from "@/lib/auth";
-
-// Helper function to check if user is admin or staff
-async function isAdminOrStaff(req: NextRequest) {
-  // Check session-based authentication (NextAuth)
-  const session = await getServerSession(authOptions);
-  
-  if (session?.user) {
-    // Check if user is admin
-    if (session.user.role === "ADMIN") return true;
-    
-    // Check if user is a team member
-    if (session.user.isTeamMember) return true;
-    
-    // Check if email has company domain
-    if (typeof session.user.email === 'string' && session.user.email.includes("@propertygpt.com")) return true;
-  }
-  
-  // Check custom admin authentication header (for admin dashboard)
-  const adminAuthHeader = req.headers.get('x-admin-auth');
-  if (adminAuthHeader === 'true') {
-    return true;
-  }
-  
-  return false;
-}
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 export async function GET(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Check admin/staff authorization
-    const isAuthorized = await isAdminOrStaff(req);
-    
-    if (!isAuthorized) {
-      return NextResponse.json({ 
-        success: false, 
-        message: "Unauthorized" 
-      }, { status: 403 });
-    }
+    await requireStaff();
 
     // Get ID from params (properly awaited)
     const { id } = await context.params;
@@ -74,6 +44,9 @@ export async function GET(
     });
     
   } catch (error: any) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error fetching construction request:", error);
     
     return NextResponse.json({ 
@@ -88,15 +61,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Check admin/staff authorization
-    const isAuthorized = await isAdminOrStaff(req);
-    
-    if (!isAuthorized) {
-      return NextResponse.json({ 
-        success: false, 
-        message: "Unauthorized" 
-      }, { status: 403 });
-    }
+    await requireStaff();
     
     // Get ID from params (properly awaited)
     const { id } = await context.params;
@@ -147,6 +112,9 @@ export async function PATCH(
     });
     
   } catch (error: any) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error updating construction request:", error);
     
     return NextResponse.json({ 

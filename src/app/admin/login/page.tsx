@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import axios from "axios";
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -12,13 +11,26 @@ export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  
-  // Check if already logged in
+
   useEffect(() => {
-    const isAdmin = localStorage.getItem("isAdmin");
-    if (isAdmin === "true") {
-      router.push("/admin");
+    let cancelled = false;
+
+    async function checkExistingSession() {
+      try {
+        const res = await fetch("/api/admin/session", {
+          credentials: "include" });
+        if (!cancelled && res.ok) {
+          router.replace("/admin");
+        }
+      } catch {
+        // Not signed in as staff — stay on login
+      }
     }
+
+    void checkExistingSession();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,44 +39,48 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      // Authenticate against the team members API
-      const response = await axios.post("/api/admin/team/login", {
-        email,
-        password
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-auth': 'true'
-        }
-      });
+      const result = await signIn("credentials", {
+        email: email.trim().toLowerCase(),
+        password,
+        redirect: false });
 
-      if (response.data) {
-        // Also establish NextAuth session (messaging uploads + APIs)
-        await signIn("credentials", {
-          email,
-          password,
-          redirect: false,
-        });
-
-        // Save admin status and user info in localStorage
-        localStorage.setItem("isAdmin", "true");
-        localStorage.setItem("adminUser", JSON.stringify({
-          id: response.data.id,
-          name: response.data.name,
-          email: response.data.email,
-          role: response.data.role
-        }));
-        
-        // Navigate to admin dashboard
-        router.push("/admin");
+      if (result?.error) {
+        setError(
+          result.error === "CredentialsSignin"
+            ? "Invalid email or password. Please try again."
+            : result.error
+        );
+        return;
       }
-    } catch (err: any) {
+
+      const sessionRes = await fetch("/api/admin/session", {
+        credentials: "include" });
+
+      if (!sessionRes.ok) {
+        await signOut({ redirect: false });
+        localStorage.removeItem("isAdmin");
+        localStorage.removeItem("adminUser");
+        setError("This account does not have staff access.");
+        return;
+      }
+
+      const staff = await sessionRes.json();
+
+      // UX-only display cache — authorization is enforced by the session cookie
+      localStorage.setItem("isAdmin", "true");
+      localStorage.setItem(
+        "adminUser",
+        JSON.stringify({
+          id: staff.id,
+          name: staff.name,
+          email: staff.email,
+          role: staff.role})
+      );
+
+      router.push("/admin");
+    } catch (err) {
       console.error("Login error:", err);
-      if (err.response?.status === 401) {
-        setError("Invalid email or password. Please try again.");
-      } else {
-        setError(err.response?.data?.error || "An error occurred during login. Please try again.");
-      }
+      setError("An error occurred during login. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -89,7 +105,10 @@ export default function AdminLogin() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium admin-text">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium admin-text"
+              >
                 Email address
               </label>
               <input
@@ -106,7 +125,10 @@ export default function AdminLogin() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium admin-text">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium admin-text"
+              >
                 Password
               </label>
               <input
@@ -131,23 +153,47 @@ export default function AdminLogin() {
             >
               {loading ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <svg
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
                   </svg>
                   Signing in...
                 </>
-              ) : "Sign in"}
+              ) : (
+                "Sign in"
+              )}
             </button>
           </div>
-          
+
           <div className="text-center text-sm admin-text-light mt-4">
             <p>
-              Return to <Link href="/" className="text-green-600 hover:text-green-700 hover:underline">main site</Link>
+              Return to{" "}
+              <Link
+                href="/"
+                className="text-green-600 hover:text-green-700 hover:underline"
+              >
+                main site
+              </Link>
             </p>
           </div>
         </form>
       </div>
     </div>
   );
-} 
+}

@@ -38,9 +38,7 @@ export default function AdminAgentRequestsPage() {
       setLoading(true);
       const params = new URLSearchParams({ limit: "50" });
       if (status) params.set("status", status);
-      const res = await axios.get(`/api/admin/agents/requests?${params}`, {
-        headers: { "x-admin-auth": "true" },
-      });
+      const res = await axios.get(`/api/admin/agents/requests?${params}`);
       setRequests(res.data.requests || []);
     } catch (e) {
       console.error(e);
@@ -59,9 +57,7 @@ export default function AdminAgentRequestsPage() {
   ) => {
     setSavingId(id);
     try {
-      await axios.patch(`/api/admin/agents/requests/${id}`, data, {
-        headers: { "x-admin-auth": "true" },
-      });
+      await axios.patch(`/api/admin/agents/requests/${id}`, data);
       await load();
     } finally {
       setSavingId(null);

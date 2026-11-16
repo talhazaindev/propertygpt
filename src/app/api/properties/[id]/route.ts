@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import {
+  canAccessVerificationDocuments,
+  toSafeVerificationDocuments,
+} from "@/lib/verification-documents";
+import { resolveStaffActor } from "@/lib/staff-auth";
+import { absoluteMediaUrls } from "@/lib/media-url";
+import {
+  AuthError,
+  authErrorResponse,
+  optionalAuth,
+  requireAuth,
+} from "@/lib/require-auth";
 
 // GET a single property
 export async function GET(
@@ -11,8 +21,17 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession(authOptions);
-    
+    const actor = await optionalAuth(req);
+    const session = actor
+      ? {
+          user: {
+            id: actor.userId,
+            role: actor.role,
+            isTeamMember: actor.kind === "web" ? actor.isTeamMember : false,
+          },
+        }
+      : null;
+
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid property ID" },
@@ -36,16 +55,30 @@ export async function GET(
     }
     
     // Check access permissions
-    const isOwner = session?.user?.id === property.ownerId.toString();
-    const isAdmin = session?.user?.role === "ADMIN";
+    const ownerId = property.ownerId ? property.ownerId.toString() : null;
+    const assignedAgentId = property.assignedAgentId
+      ? property.assignedAgentId.toString()
+      : null;
+    const isOwner = Boolean(session?.user?.id && session.user.id === ownerId);
+    const staff = await resolveStaffActor();
+    const isStaff = Boolean(staff);
     const isPublic = ["VERIFIED", "ACTIVE"].includes(property.status);
-    
-    if (!isPublic && !isOwner && !isAdmin) {
+
+    if (!isPublic && !isOwner && !isStaff) {
       return NextResponse.json(
         { error: "You don't have permission to view this property" },
         { status: 403 }
       );
     }
+
+    const canViewVerificationDocs = await canAccessVerificationDocuments(
+      {
+        id: property._id.toString(),
+        ownerId,
+        assignedAgentId,
+      },
+      session
+    );
     
     // Fetch city data
     const citiesCollection = db.collection('City');
@@ -105,34 +138,66 @@ export async function GET(
       status: property.status,
       featured: property.featured,
       contactPhone: property.contactPhone || null,
-      images: property.images || [],
-      verificationDocuments: property.verificationDocuments || [],
-      city: city ? {
-        id: city._id.toString(),
-        name: city.name,
-        province: city.province
-      } : null,
-      owner: owner || { id: null, name: "Unknown", email: null },
+      images: absoluteMediaUrls(property.images || [], req.nextUrl.origin),
+      // Never expose durable verification document URLs on the public detail payload.
+      verificationDocuments: canViewVerificationDocs
+        ? toSafeVerificationDocuments(
+            property._id.toString(),
+            property.verificationDocuments
+          )
+        : undefined,
+      hasVerificationDocuments: Array.isArray(property.verificationDocuments)
+        ? property.verificationDocuments.length > 0
+        : false,
+      city: city
+        ? {
+            id: city._id.toString(),
+            name: city.name,
+            province: city.province,
+          }
+        : null,
+      owner: canViewVerificationDocs || isOwner || isStaff
+        ? owner || { id: null, name: "Unknown", email: null }
+        : owner
+          ? {
+              id: owner.id,
+              name: owner.name,
+              email: null,
+              phoneNumber: null,
+              phone: null,
+              role: owner.role,
+              image: owner.image,
+            }
+          : { id: null, name: "Unknown", email: null },
       createdAt: property.createdAt,
       updatedAt: property.updatedAt,
       verifiedAt: property.verifiedAt,
       verifiedBy: verifier,
-      rejectionReason: property.rejectionReason,
-      ownerId: property.ownerId ? property.ownerId.toString() : null,
-      // Include tracking information for property owners
-      tracking: isOwner || isAdmin ? {
-        pendingSince: property.status === "PENDING" ? property.createdAt : null,
-        verificationDate: property.verifiedAt,
-        estimatedCompletionDate: property.status === "PENDING" 
-          ? new Date(property.createdAt.getTime() + 3 * 24 * 60 * 60 * 1000) // 3 days from creation
+      rejectionReason: isOwner || isStaff ? property.rejectionReason : null,
+      ownerId: ownerId,
+      tracking:
+        isOwner || isStaff
+          ? {
+              pendingSince:
+                property.status === "PENDING" ? property.createdAt : null,
+              verificationDate: property.verifiedAt,
+              estimatedCompletionDate:
+                property.status === "PENDING"
+                  ? new Date(
+                      property.createdAt.getTime() + 3 * 24 * 60 * 60 * 1000
+                    )
+                  : null,
+              status: property.status,
+              statusHistory: property.statusHistory || [],
+            }
           : null,
-        status: property.status,
-        statusHistory: property.statusHistory || []
-      } : null
     };
     
     return NextResponse.json(formattedProperty);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return authErrorResponse(error);
+    }
     console.error("[PROPERTY_GET_ERROR]", error);
     return NextResponse.json(
       { error: "Failed to fetch property" },
@@ -148,94 +213,87 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession(authOptions);
-    
-    if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-    
+    const actor = await requireAuth(req);
+
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid property ID" },
         { status: 400 }
       );
     }
-    
+
     const client = await clientPromise;
     const db = client.db();
-    const propertiesCollection = db.collection('Property');
-    
+    const propertiesCollection = db.collection("Property");
+
     const property = await propertiesCollection.findOne({
-      _id: new ObjectId(id)
+      _id: new ObjectId(id),
     });
-    
+
     if (!property) {
       return NextResponse.json(
         { error: "Property not found" },
         { status: 404 }
       );
     }
-    
-    // Check permissions - only owner or admin can update
-    const isOwner = session.user.id === property.ownerId.toString();
-    const isAdmin = session.user.role === "ADMIN";
-    
+
+    const isOwner = actor.userId === property.ownerId.toString();
+    const isAdmin = actor.role === "ADMIN";
+
     if (!isOwner && !isAdmin) {
       return NextResponse.json(
         { error: "You don't have permission to update this property" },
         { status: 403 }
       );
     }
-    
+
     const formData = await req.formData();
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     const now = new Date();
-    
+
     // Handle status updates (only admin can change status)
     const newStatus = formData.get("status") as string;
     if (newStatus && isAdmin) {
       updateData.status = newStatus;
-      
-      // Record status history
+
       const statusChange = {
         from: property.status,
         to: newStatus,
         changedAt: now,
-        changedBy: session.user.id
+        changedBy: actor.userId,
       };
-      
+
       updateData.statusHistory = [
         ...(property.statusHistory || []),
-        statusChange
+        statusChange,
       ];
-      
-      // Add verification info if status is changing to VERIFIED
+
       if (newStatus === "VERIFIED") {
         updateData.verifiedAt = now;
-        updateData.verifierId = new ObjectId(session.user.id);
+        updateData.verifierId = new ObjectId(actor.userId);
       }
-      
-      // Add rejection reason if status is REJECTED
+
       const rejectionReason = formData.get("rejectionReason") as string;
       if (newStatus === "REJECTED" && rejectionReason) {
         updateData.rejectionReason = rejectionReason;
       }
     }
-    
+
     // Owners can update basic property info
     if (isOwner) {
       const fields = [
-        "title", "description", "price", "bedrooms", 
-        "bathrooms", "area", "address"
+        "title",
+        "description",
+        "price",
+        "bedrooms",
+        "bathrooms",
+        "area",
+        "address",
       ];
-      
-      fields.forEach(field => {
+
+      fields.forEach((field) => {
         const value = formData.get(field);
         if (value !== null && value !== undefined) {
-          // Convert numeric fields
           if (["price", "area"].includes(field)) {
             updateData[field] = Number(value);
           } else if (["bedrooms", "bathrooms"].includes(field)) {
@@ -246,36 +304,37 @@ export async function PATCH(
         }
       });
     }
-    
-    // Update property if there are changes
+
     if (Object.keys(updateData).length > 0) {
       updateData.updatedAt = now;
-      
+
       const result = await propertiesCollection.updateOne(
         { _id: new ObjectId(id) },
         { $set: updateData }
       );
-      
+
       if (!result.matchedCount) {
         return NextResponse.json(
           { error: "Failed to update property" },
           { status: 500 }
         );
       }
-      
+
       return NextResponse.json({
         message: "Property updated successfully",
         id,
-        ...updateData
+        ...updateData,
       });
     }
-    
+
     return NextResponse.json({
       message: "No changes to update",
-      id
+      id,
     });
-    
   } catch (error) {
+    if (error instanceof AuthError) {
+      return authErrorResponse(error);
+    }
     console.error("[PROPERTY_UPDATE_ERROR]", error);
     return NextResponse.json(
       { error: "Failed to update property" },
@@ -291,66 +350,59 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession(authOptions);
-    
-    if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-    
+    const actor = await requireAuth(req);
+
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid property ID" },
         { status: 400 }
       );
     }
-    
+
     const client = await clientPromise;
     const db = client.db();
-    const propertiesCollection = db.collection('Property');
-    
+    const propertiesCollection = db.collection("Property");
+
     const property = await propertiesCollection.findOne({
-      _id: new ObjectId(id)
+      _id: new ObjectId(id),
     });
-    
+
     if (!property) {
       return NextResponse.json(
         { error: "Property not found" },
         { status: 404 }
       );
     }
-    
-    // Check permissions - only owner or admin can delete
-    const isOwner = session.user.id === property.ownerId.toString();
-    const isAdmin = session.user.role === "ADMIN";
-    
+
+    const isOwner = actor.userId === property.ownerId.toString();
+    const isAdmin = actor.role === "ADMIN";
+
     if (!isOwner && !isAdmin) {
       return NextResponse.json(
         { error: "You don't have permission to delete this property" },
         { status: 403 }
       );
     }
-    
-    // Delete the property
+
     const result = await propertiesCollection.deleteOne({
-      _id: new ObjectId(id)
+      _id: new ObjectId(id),
     });
-    
+
     if (!result.deletedCount) {
       return NextResponse.json(
         { error: "Failed to delete property" },
         { status: 500 }
       );
     }
-    
+
     return NextResponse.json({
       message: "Property deleted successfully",
-      id
+      id,
     });
-    
   } catch (error) {
+    if (error instanceof AuthError) {
+      return authErrorResponse(error);
+    }
     console.error("[PROPERTY_DELETE_ERROR]", error);
     return NextResponse.json(
       { error: "Failed to delete property" },

@@ -8,11 +8,6 @@ import {
   Menu, X, Bell, Search, ChevronDown, BarChart2, Layers, 
   FileText, MessageSquare, Calendar, Shield, UserCircle, Landmark, Upload, CircleDollarSign, BookOpen, ConstructionIcon, HardHat
 } from "lucide-react";
-import Image from "next/image";
-import { getServerSession } from "next-auth/next";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
-
 export default function AdminLayout({
   children,
 }: {
@@ -28,31 +23,47 @@ export default function AdminLayout({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   
   useEffect(() => {
-    // Check if user is logged in as admin via localStorage
-    const isAdmin = localStorage.getItem("isAdmin") === "true";
-    const storedUser = localStorage.getItem("adminUser");
-    
-    if (storedUser) {
+    let cancelled = false;
+
+    async function verifyStaffSession() {
+      // If on login page, allow access without session check
+      if (pathname === "/admin/login") {
+        if (!cancelled) setIsLoading(false);
+        return;
+      }
+
       try {
-        setAdminUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error("Failed to parse admin user", e);
+        const res = await fetch("/api/admin/session", {
+          credentials: "include" });
+
+        if (cancelled) return;
+
+        if (!res.ok) {
+          localStorage.removeItem("isAdmin");
+          localStorage.removeItem("adminUser");
+          router.replace("/admin/login");
+          return;
+        }
+
+        const staff = await res.json();
+        setAdminUser(staff);
+        localStorage.setItem("isAdmin", "true");
+        localStorage.setItem("adminUser", JSON.stringify(staff));
+        setIsAuthenticated(true);
+        setIsLoading(false);
+      } catch {
+        if (!cancelled) {
+          localStorage.removeItem("isAdmin");
+          localStorage.removeItem("adminUser");
+          router.replace("/admin/login");
+        }
       }
     }
-    
-    // If on login page, allow access
-    if (pathname === "/admin/login") {
-      setIsLoading(false);
-      return;
-    }
-    
-    if (!isAdmin) {
-      // Redirect to admin login
-      router.push("/admin/login");
-    } else {
-      setIsAuthenticated(true);
-      setIsLoading(false);
-    }
+
+    void verifyStaffSession();
+    return () => {
+      cancelled = true;
+    };
   }, [pathname, router]);
   
   // Show loading state
@@ -80,10 +91,16 @@ export default function AdminLayout({
     return null;
   }
   
-  // Handle logout
-  const handleLogout = () => {
+  // Handle logout — clear UX cache and NextAuth session
+  const handleLogout = async () => {
     localStorage.removeItem("isAdmin");
     localStorage.removeItem("adminUser");
+    try {
+      const { signOut } = await import("next-auth/react");
+      await signOut({ redirect: false });
+    } catch {
+      // Ignore signOut failures; still leave the admin UI
+    }
     router.push("/admin/login");
   };
   

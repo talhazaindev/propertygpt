@@ -58,7 +58,9 @@ export async function GET() {
         prisma.property.findMany({
           where: {
             assignedAgentId: agentId,
-            agentVerificationStatus: { in: ["ASSIGNED", "IN_PROGRESS", "SUBMITTED"] },
+            agentVerificationStatus: {
+              in: ["ASSIGNED", "IN_PROGRESS", "SUBMITTED"],
+            },
           },
           include: {
             city: { select: { id: true, name: true, province: true } },
@@ -67,7 +69,19 @@ export async function GET() {
         }),
         prisma.property.findMany({
           where: { status: { in: ["VERIFIED", "ACTIVE"] } },
-          include: {
+          select: {
+            id: true,
+            title: true,
+            price: true,
+            type: true,
+            listingType: true,
+            address: true,
+            status: true,
+            images: true,
+            area: true,
+            bedrooms: true,
+            bathrooms: true,
+            verifiedAt: true,
             city: { select: { id: true, name: true } },
           },
           orderBy: { verifiedAt: "desc" },
@@ -78,7 +92,17 @@ export async function GET() {
             assignedAgentId: agentId,
             agentVerificationStatus: "COMPLETED",
           },
-          include: {
+          select: {
+            id: true,
+            title: true,
+            price: true,
+            type: true,
+            listingType: true,
+            address: true,
+            status: true,
+            images: true,
+            agentVerificationStatus: true,
+            updatedAt: true,
             city: { select: { id: true, name: true } },
           },
           orderBy: { updatedAt: "desc" },
@@ -146,16 +170,48 @@ export async function GET() {
       return city.includes(locationHint) || address.includes(locationHint) || locationHint.includes(city);
     });
 
+    const { toSafeVerificationDocuments } = await import(
+      "@/lib/verification-documents"
+    );
+
+    const sanitizedAssigned = assignedForVerification.map((property) => {
+      const {
+        verificationDocuments,
+        agentVerifiedDocuments,
+        ...rest
+      } = property as typeof property & {
+        verificationDocuments?: unknown;
+        agentVerifiedDocuments?: unknown;
+      };
+
+      return {
+        ...rest,
+        verificationDocuments: toSafeVerificationDocuments(
+          property.id,
+          verificationDocuments
+        ),
+        agentVerifiedDocuments: toSafeVerificationDocuments(
+          property.id,
+          agentVerifiedDocuments
+        ).map((doc) => ({
+          ...doc,
+          downloadPath: `${doc.downloadPath}?source=agent`,
+        })),
+      };
+    });
+
     return NextResponse.json({
       profile,
       target,
       progress,
       earnings,
       requests,
-      assignedForVerification,
+      assignedForVerification: sanitizedAssigned,
       verifiedInventory,
       completedByAgent,
-      opportunities: opportunities.length ? opportunities : verifiedInventory.slice(0, 8),
+      opportunities: opportunities.length
+        ? opportunities
+        : verifiedInventory.slice(0, 8),
     });
   } catch (error) {
     console.error("[AGENTS_DASHBOARD]", error);

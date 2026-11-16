@@ -117,11 +117,7 @@ export function ConstructionRequestsTable() {
         params.append("status", status);
       }
 
-      const response = await fetch(`/api/construction?${params.toString()}`, {
-        headers: {
-          'x-admin-auth': 'true'
-        }
-      });
+      const response = await fetch(`/api/construction?${params.toString()}`);
       
       if (!response.ok) {
         throw new Error("Failed to fetch construction requests");

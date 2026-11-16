@@ -4,17 +4,17 @@ import { agentProfileAdminPatchSchema } from "@/schemas/agent";
 import { computeTrustScore } from "@/lib/agent-trust";
 import { sendAgentActivationEmail } from "@/lib/email";
 
-function isAdminOrStaff(request: Request) {
-  return request.headers.get("x-admin-auth") === "true";
-}
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, context: RouteContext) {
   try {
-    if (!isAdminOrStaff(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    await requireStaff();
 
     const { id } = await context.params;
 
@@ -59,6 +59,9 @@ export async function GET(request: Request, context: RouteContext) {
 
     return NextResponse.json({ agent, requests, activities });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("[ADMIN_AGENTS_ID_GET]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -66,9 +69,7 @@ export async function GET(request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    if (!isAdminOrStaff(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    await requireStaff();
 
     const { id } = await context.params;
     const body = await request.json();
@@ -222,6 +223,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     return NextResponse.json({ agent });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("[ADMIN_AGENTS_ID_PATCH]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

@@ -42,11 +42,7 @@ export default function PropertyDetail() {
     try {
       setIsLoading(true);
       const baseUrl = window.location.origin;
-      const response = await axios.get(`${baseUrl}/api/admin/properties/${propertyId}`, {
-        headers: {
-          'x-admin-auth': 'true'
-        }
-      });
+      const response = await axios.get(`${baseUrl}/api/admin/properties/${propertyId}`);
       setProperty(response.data);
     } catch (error: any) {
       console.error("Error fetching property:", error);
@@ -82,7 +78,6 @@ export default function PropertyDetail() {
         verifiedAt: new Date().toISOString()
       }, {
         headers: {
-          'x-admin-auth': 'true',
           'Content-Type': 'application/json'
         }
       });
@@ -104,7 +99,6 @@ export default function PropertyDetail() {
             verifiedAt: new Date().toISOString()
           }, {
             headers: {
-              'x-admin-auth': 'true',
               'Content-Type': 'application/json'
             }
           });
@@ -149,7 +143,6 @@ export default function PropertyDetail() {
         rejectionReason,
       }, {
         headers: {
-          'x-admin-auth': 'true',
           'Content-Type': 'application/json'
         }
       });
@@ -178,7 +171,6 @@ export default function PropertyDetail() {
         featured: !property.featured,
       }, {
         headers: {
-          'x-admin-auth': 'true',
           'Content-Type': 'application/json'
         }
       });
@@ -207,7 +199,6 @@ export default function PropertyDetail() {
       // Use query parameter instead of path parameter
       await axios.delete(`${baseUrl}/api/admin/properties?id=${propertyId}`, {
         headers: {
-          'x-admin-auth': 'true',
           'Content-Type': 'application/json'
         }
       });
@@ -520,15 +511,17 @@ export default function PropertyDetail() {
             <h2 className="text-lg font-semibold mb-4">Owner verification documents</h2>
             {Array.isArray(property.verificationDocuments) && property.verificationDocuments.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {property.verificationDocuments.map((doc: VerificationDocument, index: number) => (
+                {property.verificationDocuments.map((doc: VerificationDocument & { downloadPath?: string; id?: string }, index: number) => {
+                  const accessUrl = doc.url || doc.downloadPath;
+                  return (
                   <div
-                    key={`${doc.url}-${index}`}
+                    key={`${doc.id || doc.fileName}-${index}`}
                     className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50"
                   >
-                    {isImageDocument(doc.url, doc.fileName) ? (
+                    {accessUrl && isImageDocument(accessUrl, doc.fileName) ? (
                       <div className="relative h-40 bg-white">
                         <Image
-                          src={doc.url}
+                          src={accessUrl}
                           alt={getDocumentLabel(doc.type)}
                           fill
                           className="object-contain p-2"
@@ -545,18 +538,21 @@ export default function PropertyDetail() {
                         {getDocumentLabel(doc.type)}
                       </p>
                       <p className="text-xs text-gray-500 truncate mt-0.5">{doc.fileName}</p>
-                      <a
-                        href={doc.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        View / Download
-                      </a>
+                      {accessUrl ? (
+                        <a
+                          href={accessUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          View / Download
+                        </a>
+                      ) : null}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="bg-gray-100 rounded-lg p-8 text-center">

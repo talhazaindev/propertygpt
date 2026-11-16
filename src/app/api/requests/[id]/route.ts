@@ -4,31 +4,11 @@ import { ObjectId } from "mongodb";
 import { connectDB } from "@/lib/mongodb";
 import { updateRequestStatusSchema } from "@/schemas/request";
 import { authOptions } from "@/lib/auth";
-
-// Helper function to check if user is admin or staff
-async function isAdminOrStaff(req: NextRequest) {
-  // Check session-based authentication (NextAuth)
-  const session = await getServerSession(authOptions);
-  
-  if (session?.user) {
-    // Check if user is admin
-    if (session.user.role === "ADMIN") return true;
-    
-    // Check if user is a team member
-    if (session.user.isTeamMember) return true;
-    
-    // Check if email has company domain
-    if (typeof session.user.email === 'string' && session.user.email.includes("@propertygpt.com")) return true;
-  }
-  
-  // Check custom admin authentication header (for admin dashboard)
-  const adminAuthHeader = req.headers.get('x-admin-auth');
-  if (adminAuthHeader === 'true') {
-    return true;
-  }
-  
-  return false;
-}
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 interface RequestParams {
   params: Promise<{
@@ -38,16 +18,8 @@ interface RequestParams {
 
 export async function GET(request: NextRequest, { params }: RequestParams) {
   try {
-    // Check admin/staff authorization
-    const isAuthorized = await isAdminOrStaff(request);
-    
-    if (!isAuthorized) {
-      return NextResponse.json({ 
-        success: false, 
-        message: "Unauthorized" 
-      }, { status: 403 });
-    }
-    
+    await requireStaff();
+
     const { id } = await params;
     
     // Validate ObjectId
@@ -78,6 +50,9 @@ export async function GET(request: NextRequest, { params }: RequestParams) {
     });
     
   } catch (error: any) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error fetching property request:", error);
     
     return NextResponse.json({ 
@@ -89,15 +64,7 @@ export async function GET(request: NextRequest, { params }: RequestParams) {
 
 export async function PATCH(request: NextRequest, { params }: RequestParams) {
   try {
-    // Check admin/staff authorization
-    const isAuthorized = await isAdminOrStaff(request);
-    
-    if (!isAuthorized) {
-      return NextResponse.json({ 
-        success: false, 
-        message: "Unauthorized" 
-      }, { status: 403 });
-    }
+    await requireStaff();
     
     const { id } = await params;
     
@@ -163,6 +130,9 @@ export async function PATCH(request: NextRequest, { params }: RequestParams) {
     });
     
   } catch (error: any) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error updating property request:", error);
     
     return NextResponse.json({ 

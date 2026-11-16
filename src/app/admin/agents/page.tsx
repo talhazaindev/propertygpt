@@ -38,9 +38,7 @@ export default function AdminAgentsPage() {
       if (query) params.set("query", query);
       if (status) params.set("status", status);
       if (isGolden) params.set("isGolden", isGolden);
-      const res = await axios.get(`/api/admin/agents?${params}`, {
-        headers: { "x-admin-auth": "true" },
-      });
+      const res = await axios.get(`/api/admin/agents?${params}`);
       setAgents(res.data.agents || []);
       setPages(res.data.pagination?.pages || 1);
     } catch (e) {

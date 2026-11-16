@@ -156,7 +156,6 @@ export default function AddTeamMemberPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": "true"
         },
         body: JSON.stringify(dataToSubmit),
       });

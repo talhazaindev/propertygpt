@@ -1,67 +1,74 @@
 import { NextResponse } from "next/server";
+import bcrypt from "bcrypt";
 import prisma from "@/lib/prismadb";
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
+
+const ALLOWED_USER_ROLES = new Set(["ADMIN", "BUYER", "SELLER", "AGENT"]);
 
 export async function GET(request: Request) {
   try {
-    // In a production app, you'd want to add admin authentication checks here
-    
-    // Get query parameters for filtering
+    await requireStaff();
+
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get('query') || '';
-    const role = searchParams.get('role');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    
-    // Calculate pagination
-    const skip = (page - 1) * limit;
-    
-    // Build the where clause
-    const where: any = {};
-    
+    const query = searchParams.get("query") || "";
+    const role = searchParams.get("role");
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = Math.min(
+      Math.max(parseInt(searchParams.get("limit") || "10", 10) || 10, 1),
+      100
+    );
+    const skip = (Math.max(page, 1) - 1) * limit;
+
+    const where: Record<string, unknown> = {};
+
     if (query) {
       where.OR = [
-        { name: { contains: query, mode: 'insensitive' } },
-        { email: { contains: query, mode: 'insensitive' } }
+        { name: { contains: query, mode: "insensitive" } },
+        { email: { contains: query, mode: "insensitive" } },
       ];
     }
-    
+
     if (role) {
       where.role = role;
     }
-    
-    // Fetch users with pagination
-    const users = await prisma.user.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        image: true,
-        phoneNumber: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      skip,
-      take: limit,
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-    
-    // Get total count for pagination
-    const totalUsers = await prisma.user.count({ where });
-    
+
+    const [users, totalUsers] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          image: true,
+          phoneNumber: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.user.count({ where }),
+    ]);
+
     return NextResponse.json({
       users,
       pagination: {
         total: totalUsers,
         pages: Math.ceil(totalUsers / limit),
-        page,
-        limit
-      }
+        page: Math.max(page, 1),
+        limit,
+      },
     });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("[ADMIN_USERS_GET]", error);
     return NextResponse.json(
       { error: "Internal server error" },
@@ -72,55 +79,57 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    // In a production app, you'd want to add admin authentication checks here
-    
+    await requireStaff();
+
     const body = await request.json();
     const { name, email, password, role, phoneNumber } = body;
-    
-    // Basic validation
+
     if (!name || !email || !password || !role) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
-    
-    // Check if user with email already exists
+
+    if (!ALLOWED_USER_ROLES.has(role)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email: normalizedEmail },
     });
-    
+
     if (existingUser) {
       return NextResponse.json(
         { error: "User with this email already exists" },
         { status: 400 }
       );
     }
-    
-    // Hash password using bcrypt
-    const bcrypt = require('bcrypt');
+
     const hashedPassword = await bcrypt.hash(password, 12);
-    
-    // Create the user
+
     const user = await prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         hashedPassword,
         role,
         phoneNumber,
-      }
+      },
     });
-    
-    // Remove sensitive information
+
     const { hashedPassword: _, ...safeUser } = user;
-    
     return NextResponse.json(safeUser, { status: 201 });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("[ADMIN_USERS_POST]", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
     );
   }
-} 
+}

@@ -91,9 +91,6 @@ export default function AdminDashboard() {
 
         try {
           const response = await axios.get('/api/admin/dashboard', {
-            headers: {
-              'x-admin-auth': 'true'
-            },
             timeout: 10000
           });
           dashboardData = response.data;
@@ -475,11 +472,7 @@ function TeamMembersList() {
         setLoading(true);
         setError(null);
         
-        const response = await axios.get('/api/admin/team?limit=5', {
-          headers: {
-            'x-admin-auth': 'true'
-          }
-        });
+        const response = await axios.get('/api/admin/team?limit=5');
         
         if (response.data && response.data.teamMembers) {
           setTeamMembers(response.data.teamMembers);

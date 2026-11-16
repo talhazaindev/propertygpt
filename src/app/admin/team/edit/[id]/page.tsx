@@ -80,11 +80,7 @@ export default function EditTeamMemberPage() {
       setIsLoading(true);
       try {
         // Fetch team member data
-        const memberResponse = await fetch(`/api/admin/team/${id}`, {
-          headers: {
-            'x-admin-auth': 'true'
-          }
-        });
+        const memberResponse = await fetch(`/api/admin/team/${id}`);
         if (!memberResponse.ok) {
           throw new Error("Failed to fetch team member data");
         }
@@ -137,7 +133,6 @@ export default function EditTeamMemberPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          'x-admin-auth': 'true'
         },
         body: JSON.stringify(submitData),
       });

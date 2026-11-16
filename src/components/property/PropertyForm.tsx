@@ -20,7 +20,12 @@ import { City, getCities } from "@/lib/city-service";
 import { uploadFiles } from "@/lib/uploadthing";
 import Image from "next/image";
 
-function uploadedFileUrl(file: { ufsUrl?: string; url?: string }): string {
+function uploadedFileUrl(file: {
+  ufsUrl?: string;
+  url?: string;
+  key?: string;
+  serverData?: { key?: string; url?: string };
+}): string {
   return file.ufsUrl || file.url || "";
 }
 
@@ -272,13 +277,18 @@ export default function PropertyForm({
         uploadedDocs = docsToUpload.map((doc, index) => {
           const uploaded = docResults[index];
           const url = uploaded ? uploadedFileUrl(uploaded) : "";
-          if (!url) {
+          const fileKey =
+            uploaded?.key ||
+            uploaded?.serverData?.key ||
+            undefined;
+          if (!url && !fileKey) {
             throw new Error(`Failed to upload document: ${doc.file.name}`);
           }
           return {
             type: doc.type,
             url,
             fileName: doc.file.name,
+            ...(fileKey ? { fileKey } : {}),
           };
         });
       } catch (uploadError) {

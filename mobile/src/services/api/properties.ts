@@ -1,0 +1,95 @@
+import { apiClient } from "@/src/services/api/client";
+
+export type PropertyListItem = {
+  id: string;
+  title: string;
+  description?: string;
+  price: number;
+  type: string;
+  listingType: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  area: number;
+  address: string;
+  status: string;
+  featured: boolean;
+  images: string[];
+  city?: { id: string; name: string; province: string } | null;
+  rejectionReason?: string | null;
+  createdAt?: string;
+};
+
+export type PropertyDetail = PropertyListItem & {
+  description: string;
+  contactPhone?: string | null;
+  owner?: {
+    id?: string | null;
+    name?: string | null;
+    email?: string | null;
+    phoneNumber?: string | null;
+    phone?: string | null;
+    image?: string | null;
+    role?: string | null;
+  } | null;
+  hasVerificationDocuments?: boolean;
+  verifiedAt?: string | null;
+};
+
+export type PropertyListResponse = {
+  properties: PropertyListItem[];
+  pagination: {
+    total: number;
+    pages: number;
+    page: number;
+    limit: number;
+  };
+};
+
+export async function fetchProperties(params: {
+  listingType?: "SALE" | "RENTAL";
+  search?: string;
+  sortBy?: "newest" | "oldest" | "price_low" | "price_high";
+  featured?: boolean;
+  page?: number;
+  limit?: number;
+}): Promise<PropertyListResponse> {
+  const { data } = await apiClient.get<PropertyListResponse>("/api/properties", {
+    params: {
+      listingType: params.listingType,
+      search: params.search || undefined,
+      sortBy: params.sortBy || "newest",
+      featured: params.featured ? "true" : undefined,
+      page: params.page || 1,
+      limit: params.limit || 20,
+      status: "VERIFIED,ACTIVE",
+    },
+  });
+  return data;
+}
+
+export async function fetchPropertyById(id: string): Promise<PropertyDetail> {
+  const { data } = await apiClient.get<PropertyDetail>(`/api/properties/${id}`);
+  return data;
+}
+
+export async function fetchMyProperties(params?: {
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<PropertyListResponse> {
+  const { data } = await apiClient.get<PropertyListResponse>("/api/properties/mine", {
+    params: {
+      status: params?.status,
+      page: params?.page || 1,
+      limit: params?.limit || 20,
+    },
+  });
+  return data;
+}
+
+export async function fetchCities(): Promise<
+  Array<{ id: string; name: string; province: string }>
+> {
+  const { data } = await apiClient.get("/api/cities");
+  return Array.isArray(data) ? data : [];
+}

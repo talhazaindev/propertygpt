@@ -21,8 +21,10 @@ import { uploadFiles } from "@/lib/uploadthing";
 
 type Doc = {
   type: string;
-  url: string;
+  url?: string;
   fileName?: string;
+  id?: string;
+  downloadPath?: string;
 };
 
 type PropertyAssignment = {
@@ -338,15 +340,17 @@ export default function AgentAssignedVerificationCard({
           </p>
           {ownerDocs.length > 0 ? (
             <div className="grid max-h-[320px] gap-2 overflow-y-auto sm:grid-cols-2">
-              {ownerDocs.map((doc, i) => (
+              {ownerDocs.map((doc, i) => {
+                const accessUrl = doc.downloadPath || doc.url;
+                return (
                 <a
-                  key={`${doc.url}-${i}`}
-                  href={doc.url}
+                  key={`${doc.id || doc.fileName || i}`}
+                  href={accessUrl || "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-xl border border-[#dbe0d6] bg-[#faf8f3] p-2 transition hover:border-[#195b3b]/40"
                 >
-                  {isImageDoc(doc.url, doc.fileName) ? (
+                  {accessUrl && isImageDoc(accessUrl, doc.fileName) && doc.url ? (
                     <div className="relative mb-2 h-24 overflow-hidden rounded-lg bg-white">
                       <Image
                         src={doc.url}
@@ -369,7 +373,8 @@ export default function AgentAssignedVerificationCard({
                     <ExternalLink className="h-3 w-3" /> Open
                   </p>
                 </a>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-[#c5d9c9] bg-[#f3f7f1] px-3 py-8 text-center text-sm text-[#5c6b61]">
@@ -419,8 +424,8 @@ export default function AgentAssignedVerificationCard({
               <div className="flex flex-wrap gap-2 pt-1">
                 {property.agentVerifiedDocuments.map((doc, i) => (
                   <a
-                    key={i}
-                    href={doc.url}
+                    key={doc.id || i}
+                    href={doc.downloadPath || doc.url || "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-medium text-[#195b3b] ring-1 ring-sky-200"

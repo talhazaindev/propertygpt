@@ -94,13 +94,7 @@ export default function PostPropertyDetailPage() {
       setIsLoading(true);
       const baseUrl = window.location.origin;
       const response = await axios.get(
-        `${baseUrl}/api/admin/properties/${propertyId}`,
-        {
-          headers: {
-            "x-admin-auth": "true",
-          },
-        }
-      );
+        `${baseUrl}/api/admin/properties/${propertyId}`);
 
       const propertyData = response.data;
       setProperty(propertyData);
@@ -234,7 +228,6 @@ export default function PostPropertyDetailPage() {
 
       await axios.post(`${baseUrl}/api/admin/properties/post`, formData, {
         headers: {
-          "x-admin-auth": "true",
           "Content-Type": "multipart/form-data",
         },
       });
@@ -268,7 +261,6 @@ export default function PostPropertyDetailPage() {
         { status: nextStatus },
         {
           headers: {
-            "x-admin-auth": "true",
             "Content-Type": "application/json",
           },
         }

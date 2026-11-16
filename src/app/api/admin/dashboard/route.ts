@@ -1,43 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
-// Helper function to check if user is admin
-async function isAdminOrStaff(req: NextRequest) {
-  // OPTION 1: Check session-based authentication (NextAuth)
-  const session = await getServerSession(authOptions);
-  
-  if (session?.user) {
-    // Check if user is admin or staff
-    if (session.user.role === "ADMIN") return true;
-    
-    // Check if user is a team member
-    if (session.user.isTeamMember) return true;
-    
-    // Check if email has company domain
-    if (typeof session.user.email === 'string' && session.user.email.includes("@propertygpt.com")) return true;
-  }
-  
-  // OPTION 2: Check custom admin authentication header (for admin dashboard)
-  const adminAuthHeader = req.headers.get('x-admin-auth');
-  if (adminAuthHeader === 'true') {
-    return true;
-  }
-  
-  return false;
-}
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 // GET /api/admin/dashboard - Get dashboard stats
 export async function GET(request: NextRequest) {
   try {
-    // Check admin access
-    if (!await isAdminOrStaff(request)) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
+    await requireStaff();
     
     // Prepare default response with safe values
     let dashboardStats: {
@@ -239,6 +211,9 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(dashboardStats);
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error fetching dashboard stats:", error);
     // Return a basic response to avoid 500 error
     return NextResponse.json({

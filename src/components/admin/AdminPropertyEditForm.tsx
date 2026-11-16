@@ -41,9 +41,7 @@ export default function AdminPropertyEditForm({
           area: Number(form.area),
           address: form.address,
           contactPhone: form.contactPhone || null,
-        },
-        { headers: { "x-admin-auth": "true" } }
-      );
+        });
       toast.success("Property details saved — ready to assign an agent");
       onSaved();
     } catch (error: unknown) {

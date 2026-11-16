@@ -182,7 +182,6 @@ export default function NewBlogPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-auth": "true",
         },
         body: JSON.stringify(formData),
       });

@@ -4,9 +4,11 @@ import clientPromise from "@/lib/mongodb";
 import prisma from "@/lib/prismadb";
 import { sendAgentVerificationLeadEmail } from "@/lib/email";
 
-function isAdminOrStaff(req: NextRequest) {
-  return req.headers.get("x-admin-auth") === "true";
-}
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -16,9 +18,7 @@ type RouteContext = { params: Promise<{ id: string }> };
  */
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
-    if (!isAdminOrStaff(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    await requireStaff();
 
     const { id: propertyId } = await context.params;
     if (!propertyId || !ObjectId.isValid(propertyId)) {
@@ -140,6 +140,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       },
     });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("[PROPERTY_ASSIGN]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

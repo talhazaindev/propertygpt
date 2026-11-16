@@ -1,0 +1,17 @@
+appId: pk.alwahabco.manzil
+---
+- launchApp
+- assertVisible:
+    id: "home-screen"
+- tapOn:
+    id: "home-browse-cta"
+- assertVisible:
+    id: "browse-screen"
+- tapOn:
+    id: "browse-filter-rental"
+- assertVisible:
+    id: "browse-filter-rental"
+- tapOn:
+    id: "browse-filter-sale"
+- assertVisible:
+    id: "browse-search-input"

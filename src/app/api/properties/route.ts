@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/mongodb";
 import { promises as fs } from "fs";
 import path from "path";
@@ -16,6 +14,7 @@ import {
 } from "@/schemas/property";
 import { z } from "zod";
 import { sendPropertySubmittedEmail } from "@/lib/email";
+import { AuthError, authErrorResponse, requireAuth } from "@/lib/require-auth";
 
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
@@ -33,6 +32,7 @@ function isVerificationDocumentType(value: string): value is VerificationDocumen
 type SessionUser = { id: string };
 
 type PreparedVerificationDocument = {
+  fileKey?: string;
   type: VerificationDocumentType;
   url: string;
   fileName: string;
@@ -242,6 +242,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
 
     const type = searchParams.get("type");
+    const listingType = searchParams.get("listingType");
+    const search =
+      searchParams.get("search") || searchParams.get("query") || undefined;
     const minPrice = searchParams.get("minPrice")
       ? parseFloat(searchParams.get("minPrice") as string)
       : undefined;
@@ -249,48 +252,76 @@ export async function GET(req: NextRequest) {
       ? parseFloat(searchParams.get("maxPrice") as string)
       : undefined;
     const bedrooms = searchParams.get("bedrooms")
-      ? parseInt(searchParams.get("bedrooms") as string)
+      ? parseInt(searchParams.get("bedrooms") as string, 10)
       : undefined;
     const bathrooms = searchParams.get("bathrooms")
-      ? parseInt(searchParams.get("bathrooms") as string)
+      ? parseInt(searchParams.get("bathrooms") as string, 10)
       : undefined;
     const cityId = searchParams.get("cityId");
     const status = searchParams.get("status");
     const featured = searchParams.get("featured") === "true" ? true : undefined;
-    const userId = searchParams.get("userId");
+    // Public userId filter removed — use /api/properties/mine instead.
 
-    const page = searchParams.get("page")
-      ? parseInt(searchParams.get("page") as string)
-      : 1;
-    const rawLimit = searchParams.get("limit")
-      ? parseInt(searchParams.get("limit") as string)
-      : 10;
+    const rawPage = parseInt(searchParams.get("page") || "1", 10);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const rawLimit = parseInt(searchParams.get("limit") || "10", 10);
     const limit = Math.min(Math.max(rawLimit || 10, 1), MAX_LIST_LIMIT);
     const skip = (page - 1) * limit;
+
+    const sortBy = searchParams.get("sortBy") || searchParams.get("sort") || "newest";
+    const sortFieldParam = searchParams.get("sortField");
+    const sortOrderParam = searchParams.get("sortOrder");
 
     const filter: Record<string, unknown> = {};
 
     if (type) filter.type = type;
-    if (minPrice || maxPrice) {
+    if (listingType === "SALE" || listingType === "RENTAL") {
+      filter.listingType = listingType;
+    }
+    if (Number.isFinite(minPrice) || Number.isFinite(maxPrice)) {
       filter.price = {
-        ...(minPrice ? { gte: minPrice } : {}),
-        ...(maxPrice ? { lte: maxPrice } : {}),
+        ...(Number.isFinite(minPrice) ? { gte: minPrice } : {}),
+        ...(Number.isFinite(maxPrice) ? { lte: maxPrice } : {}),
       };
     }
-    if (bedrooms) filter.bedrooms = bedrooms;
-    if (bathrooms) filter.bathrooms = bathrooms;
+    if (Number.isFinite(bedrooms)) filter.bedrooms = { gte: bedrooms };
+    if (Number.isFinite(bathrooms)) filter.bathrooms = { gte: bathrooms };
     if (cityId) filter.cityId = cityId;
 
     if (status) {
       if (status.includes(",")) {
-        filter.status = { in: status.split(",") };
+        filter.status = { in: status.split(",").map((s) => s.trim()).filter(Boolean) };
       } else {
         filter.status = status;
       }
+    } else {
+      // Public default: only published verified inventory
+      filter.status = { in: ["VERIFIED", "ACTIVE"] };
     }
 
     if (featured) filter.featured = featured;
-    if (userId) filter.ownerId = userId;
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      filter.OR = [
+        { title: { contains: q, mode: "insensitive" } },
+        { address: { contains: q, mode: "insensitive" } },
+        { description: { contains: q, mode: "insensitive" } },
+      ];
+    }
+
+    let orderBy: Record<string, "asc" | "desc"> = { createdAt: "desc" };
+    if (sortFieldParam === "price" || sortFieldParam === "createdAt") {
+      orderBy = {
+        [sortFieldParam]: sortOrderParam === "asc" ? "asc" : "desc",
+      };
+    } else if (sortBy === "oldest") {
+      orderBy = { createdAt: "asc" };
+    } else if (sortBy === "price_low") {
+      orderBy = { price: "asc" };
+    } else if (sortBy === "price_high") {
+      orderBy = { price: "desc" };
+    }
 
     const [properties, totalCount] = await Promise.all([
       prisma.property.findMany({
@@ -312,8 +343,6 @@ export async function GET(req: NextRequest) {
           createdAt: true,
           updatedAt: true,
           cityId: true,
-          ownerId: true,
-          rejectionReason: true,
           city: {
             select: {
               id: true,
@@ -325,27 +354,32 @@ export async function GET(req: NextRequest) {
             select: {
               id: true,
               name: true,
-              email: true,
-              phoneNumber: true,
             },
           },
         },
         skip,
         take: limit,
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy,
       }),
       prisma.property.count({
         where: filter,
       }),
     ]);
 
+    const { absoluteMediaUrls } = await import("@/lib/media-url");
+    const origin = req.nextUrl.origin;
+
     return NextResponse.json({
-      properties,
+      properties: properties.map((property) => ({
+        ...property,
+        images: absoluteMediaUrls(property.images, origin),
+        // PII scrubbed from public list responses
+        rejectionReason: undefined,
+        ownerId: undefined,
+      })),
       pagination: {
         total: totalCount,
-        pages: Math.ceil(totalCount / limit),
+        pages: Math.ceil(totalCount / limit) || 0,
         page,
         limit,
       },
@@ -408,6 +442,12 @@ async function handleJsonCreate(
     const docType = String(doc?.type ?? "");
     const url = String(doc?.url ?? "");
     const fileName = String(doc?.fileName ?? "document");
+    const fileKey =
+      typeof doc?.fileKey === "string"
+        ? doc.fileKey
+        : typeof doc?.key === "string"
+          ? doc.key
+          : undefined;
 
     if (!isVerificationDocumentType(docType)) {
       return NextResponse.json(
@@ -415,9 +455,9 @@ async function handleJsonCreate(
         { status: 400 }
       );
     }
-    if (!url) {
+    if (!url && !fileKey) {
       return NextResponse.json(
-        { error: "Each verification document must include a url" },
+        { error: "Each verification document must include a url or fileKey" },
         { status: 400 }
       );
     }
@@ -427,6 +467,7 @@ async function handleJsonCreate(
       url,
       fileName,
       uploadedAt: new Date(),
+      ...(fileKey ? { fileKey } : {}),
     });
   }
 
@@ -638,12 +679,8 @@ async function handleFormDataCreate(
 // POST a new property
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const sessionUser: SessionUser = { id: session.user.id };
+    const actor = await requireAuth(req);
+    const sessionUser: SessionUser = { id: actor.userId };
     const contentType = req.headers.get("content-type") || "";
 
     if (contentType.includes("application/json")) {
@@ -652,6 +689,9 @@ export async function POST(req: NextRequest) {
 
     return await handleFormDataCreate(req, sessionUser);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return authErrorResponse(error);
+    }
     console.error("Error creating property:", error);
     const { errorMessage, statusCode } = mapCreateError(error);
     return NextResponse.json({ error: errorMessage }, { status: statusCode });

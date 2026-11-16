@@ -43,9 +43,7 @@ export default function AssignAgentPanel({
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await axios.get("/api/admin/agents/active", {
-          headers: { "x-admin-auth": "true" },
-        });
+        const res = await axios.get("/api/admin/agents/active");
         setAgents(res.data.agents || []);
       } catch {
         toast.error("Failed to load agents");
@@ -63,11 +61,9 @@ export default function AssignAgentPanel({
   const assign = async (agentId: string | null) => {
     try {
       setSaving(true);
-      await axios.post(
-        `/api/admin/properties/${propertyId}/assign`,
-        { agentId },
-        { headers: { "x-admin-auth": "true" } }
-      );
+      await axios.post(`/api/admin/properties/${propertyId}/assign`, {
+        agentId,
+      });
       toast.success(agentId ? "Assigned to agent" : "Agent unassigned");
       onUpdated();
     } catch (error: unknown) {

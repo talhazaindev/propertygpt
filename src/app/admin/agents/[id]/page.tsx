@@ -60,15 +60,9 @@ export default function AdminAgentDetailPage() {
     try {
       setLoading(true);
       const [agentRes, teamRes, targetsRes] = await Promise.all([
-        axios.get(`/api/admin/agents/${id}`, {
-          headers: { "x-admin-auth": "true" },
-        }),
-        axios.get(`/api/admin/team?role=CUSTOMER_SUPPORT&limit=50`, {
-          headers: { "x-admin-auth": "true" },
-        }),
-        axios.get(`/api/admin/agents/${id}/targets`, {
-          headers: { "x-admin-auth": "true" },
-        }),
+        axios.get(`/api/admin/agents/${id}`),
+        axios.get(`/api/admin/team?role=CUSTOMER_SUPPORT&limit=50`),
+        axios.get(`/api/admin/agents/${id}/targets`),
       ]);
       const a = agentRes.data.agent;
       setAgent(a);
@@ -104,9 +98,7 @@ export default function AdminAgentDetailPage() {
     try {
       setSaving(true);
       setMessage(null);
-      await axios.patch(`/api/admin/agents/${id}`, payload, {
-        headers: { "x-admin-auth": "true" },
-      });
+      await axios.patch(`/api/admin/agents/${id}`, payload);
       setMessage(successMsg);
       await load();
     } catch (e: unknown) {
@@ -164,9 +156,7 @@ export default function AdminAgentDetailPage() {
           rewardDescription: targetForm.rewardDescription || null,
           periodStart: new Date(targetForm.periodStart).toISOString(),
           periodEnd: new Date(targetForm.periodEnd + "T23:59:59").toISOString(),
-        },
-        { headers: { "x-admin-auth": "true" } }
-      );
+        });
       setMessage("Target saved");
       await load();
     } catch (e: unknown) {
@@ -184,9 +174,7 @@ export default function AdminAgentDetailPage() {
     requestId: string,
     data: Record<string, unknown>
   ) => {
-    await axios.patch(`/api/admin/agents/requests/${requestId}`, data, {
-      headers: { "x-admin-auth": "true" },
-    });
+    await axios.patch(`/api/admin/agents/requests/${requestId}`, data);
     await load();
   };
 

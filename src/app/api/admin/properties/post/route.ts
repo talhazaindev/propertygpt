@@ -9,28 +9,11 @@ import {
   propertyTypes,
   propertyListingTypes,
 } from "@/schemas/property";
-
-async function isAdminOrStaff(req: NextRequest): Promise<boolean> {
-  const session = await getServerSession(authOptions);
-
-  if (session?.user) {
-    if (session.user.role === "ADMIN") return true;
-    if (session.user.isTeamMember) return true;
-    if (
-      typeof session.user.email === "string" &&
-      session.user.email.includes("@propertygpt.com")
-    ) {
-      return true;
-    }
-  }
-
-  const adminAuthHeader = req.headers.get("x-admin-auth");
-  if (adminAuthHeader === "true") {
-    return true;
-  }
-
-  return false;
-}
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 function parseOptionalInt(value: FormDataEntryValue | null): number | null {
   if (value === null || value === undefined || value === "") return null;
@@ -52,13 +35,9 @@ function parseRequiredNumber(
 // POST endpoint to update a property for posting on the main site
 export async function POST(req: NextRequest) {
   try {
-    if (!(await isAdminOrStaff(req))) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    await requireStaff();
 
     const session = await getServerSession(authOptions);
-    console.log("Session in post property request:", session?.user?.email);
-
     const client = await clientPromise;
     const db = client.db();
     const teamMemberCollection = db.collection("TeamMember");
@@ -274,6 +253,9 @@ export async function POST(req: NextRequest) {
       id: propertyId,
     });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error posting property:", error);
     return NextResponse.json(
       { error: "Internal server error" },

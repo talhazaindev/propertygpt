@@ -2,17 +2,17 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prismadb";
 import { agentRequestAdminPatchSchema } from "@/schemas/agent";
 
-function isAdminOrStaff(request: Request) {
-  return request.headers.get("x-admin-auth") === "true";
-}
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, context: RouteContext) {
   try {
-    if (!isAdminOrStaff(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    await requireStaff();
 
     const { id } = await context.params;
     const agentRequest = await prisma.agentRequest.findUnique({
@@ -36,6 +36,9 @@ export async function GET(request: Request, context: RouteContext) {
 
     return NextResponse.json({ request: agentRequest });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("[ADMIN_AGENT_REQUEST_GET]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -43,9 +46,7 @@ export async function GET(request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    if (!isAdminOrStaff(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    await requireStaff();
 
     const { id } = await context.params;
     const body = await request.json();
@@ -104,6 +105,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     return NextResponse.json({ request: updated });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("[ADMIN_AGENT_REQUEST_PATCH]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

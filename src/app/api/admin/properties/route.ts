@@ -5,43 +5,16 @@ import { prisma } from "@/lib/prisma";
 import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";
 import { sendPropertyVerifiedEmail } from "@/lib/email";
-
-// Helper function to check if user is admin
-async function isAdminOrStaff(req: NextRequest) {
-  // OPTION 1: Check session-based authentication (NextAuth)
-  const session = await getServerSession(authOptions);
-  console.log("Session in API:", session);
-  
-  if (session?.user) {
-    // Check if user is admin or staff
-    if (session.user.role === "ADMIN") return true;
-    
-    // Check if user is a team member
-    if (session.user.isTeamMember) return true;
-    
-    // Check if email has company domain
-    if (typeof session.user.email === 'string' && session.user.email.includes("@propertygpt.com")) return true;
-  }
-  
-  // OPTION 2: Check custom admin authentication header (for admin dashboard)
-  const adminAuthHeader = req.headers.get('x-admin-auth');
-  if (adminAuthHeader === 'true') {
-    return true;
-  }
-  
-  return false;
-}
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 // GET /api/admin/properties - Get all properties for admin
 export async function GET(request: NextRequest) {
   try {
-    // Check admin access
-    if (!await isAdminOrStaff(request)) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
+    await requireStaff();
     
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
@@ -132,6 +105,9 @@ export async function GET(request: NextRequest) {
     const total = await prisma.property.count({ where: filter });
     return NextResponse.json({ properties, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error fetching properties for admin:", error);
     return NextResponse.json(
       { error: "Failed to fetch properties" },
@@ -143,14 +119,8 @@ export async function GET(request: NextRequest) {
 // PATCH /api/admin/properties/:id - Update property verification status
 export async function PATCH(request: NextRequest) {
   try {
-    // Check admin access
-    if (!await isAdminOrStaff(request)) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-    
+    await requireStaff();
+
     const session = await getServerSession(authOptions);
     const body = await request.json();
     const { searchParams } = new URL(request.url);
@@ -356,6 +326,9 @@ export async function PATCH(request: NextRequest) {
       );
     }
   } catch (error: any) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error updating property:", error);
     if (error.code === "P2025") {
       return NextResponse.json(
@@ -373,14 +346,8 @@ export async function PATCH(request: NextRequest) {
 // PUT /api/admin/properties/:id - Update property details
 export async function PUT(request: NextRequest) {
   try {
-    // Check admin access
-    if (!await isAdminOrStaff(request)) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-    
+    await requireStaff();
+
     const body = await request.json();
     const { searchParams } = new URL(request.url);
     
@@ -464,6 +431,9 @@ export async function PUT(request: NextRequest) {
       );
     }
   } catch (error: any) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error updating property details:", error);
     if (error.code === "P2025") {
       return NextResponse.json(
@@ -481,14 +451,8 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/admin/properties?id=123 - Delete a property
 export async function DELETE(request: NextRequest) {
   try {
-    // Check admin access
-    if (!await isAdminOrStaff(request)) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-    
+    await requireStaff();
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     
@@ -537,6 +501,9 @@ export async function DELETE(request: NextRequest) {
       );
     }
   } catch (error: any) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error deleting property:", error);
     return NextResponse.json(
       { error: "Failed to delete property" },

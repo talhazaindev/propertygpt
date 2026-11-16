@@ -67,11 +67,7 @@ export default function BlogsPage() {
       
       url += `&sortBy=${sortField}&sortOrder=${sortOrder}`;
       
-      const response = await fetch(url, {
-        headers: {
-          "x-admin-auth": "true",
-        },
-      });
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error("Failed to fetch blogs");
@@ -117,10 +113,7 @@ export default function BlogsPage() {
       try {
         const response = await fetch(`/api/admin/blogs/${id}`, {
           method: "DELETE",
-          headers: {
-            "x-admin-auth": "true",
-          },
-        });
+          });
         
         if (!response.ok) {
           throw new Error("Failed to delete blog");

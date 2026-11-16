@@ -86,11 +86,7 @@ export function PropertyRequestsTable() {
           params.append("status", statusFilter);
         }
 
-        const response = await fetch(`/api/requests?${params}`, {
-          headers: {
-            'x-admin-auth': 'true'
-          }
-        });
+        const response = await fetch(`/api/requests?${params}`);
         if (!response.ok) {
           throw new Error("Failed to fetch requests");
         }
@@ -116,7 +112,6 @@ export function PropertyRequestsTable() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          'x-admin-auth': 'true'
         },
         body: JSON.stringify({ status: newStatus }),
       });
@@ -144,10 +139,7 @@ export function PropertyRequestsTable() {
     if (confirm("Are you sure you want to delete this request? This action cannot be undone.")) {
       try {
         const response = await fetch(`/api/requests/${requestId}`, {
-          method: "DELETE",
-          headers: {
-            'x-admin-auth': 'true'
-          }
+          method: "DELETE"
         });
 
         if (!response.ok) {

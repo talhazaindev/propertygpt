@@ -63,10 +63,7 @@ export default function PostPropertyPage() {
           search: searchTerm || undefined,
           status: statusParam,
         },
-        headers: {
-          "x-admin-auth": "true",
-        },
-      });
+        });
 
       setProperties(response.data.properties || []);
       setTotalPages(response.data.pagination?.pages || 1);
@@ -115,7 +112,6 @@ export default function PostPropertyPage() {
         { status: nextStatus },
         {
           headers: {
-            "x-admin-auth": "true",
             "Content-Type": "application/json",
           },
         }

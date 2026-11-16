@@ -1,12 +1,12 @@
 /**
  * Auth helpers for the messaging system.
- * Users use NextAuth; staff may use NextAuth or admin-panel localStorage + headers.
+ * Bearer-first mobile access tokens, otherwise NextAuth cookie session.
+ * Client-supplied admin headers are never trusted.
  */
 
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prismadb";
 import type { TeamMember, TeamRole } from "@prisma/client";
+import { AuthError, requireAuth } from "@/lib/require-auth";
 
 const INBOX_ROLES: TeamRole[] = ["SUPER_ADMIN", "CUSTOMER_SUPPORT"];
 
@@ -25,12 +25,22 @@ export function canAccessStaffInbox(role: TeamRole): boolean {
 export async function resolveMessagingActor(
   req: Request
 ): Promise<MessagingActor | null> {
-  const session = await getServerSession(authOptions);
+  try {
+    const actor = await requireAuth(req);
 
-  if (session?.user?.id) {
-    if (session.user.isTeamMember) {
+    // Mobile Bearer sessions are always consumer users (never staff).
+    if (actor.kind === "mobile") {
+      return {
+        kind: "user",
+        userId: actor.userId,
+        email: actor.email,
+        name: actor.name,
+      };
+    }
+
+    if (actor.isTeamMember) {
       const teamMember = await prisma.teamMember.findUnique({
-        where: { id: session.user.id },
+        where: { id: actor.userId },
       });
       if (teamMember?.isActive) {
         return {
@@ -39,34 +49,21 @@ export async function resolveMessagingActor(
           canAccessInbox: canAccessStaffInbox(teamMember.role),
         };
       }
-    } else {
-      return {
-        kind: "user",
-        userId: session.user.id,
-        email: session.user.email || "",
-        name: session.user.name || null,
-      };
+      return null;
     }
-  }
 
-  const adminAuth = req.headers.get("x-admin-auth");
-  const adminEmail =
-    req.headers.get("x-admin-email") || req.headers.get("x-team-email");
-
-  if (adminAuth === "true" && adminEmail) {
-    const teamMember = await prisma.teamMember.findUnique({
-      where: { email: adminEmail },
-    });
-    if (teamMember?.isActive) {
-      return {
-        kind: "staff",
-        teamMember,
-        canAccessInbox: canAccessStaffInbox(teamMember.role),
-      };
+    return {
+      kind: "user",
+      userId: actor.userId,
+      email: actor.email,
+      name: actor.name,
+    };
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return null;
     }
+    throw error;
   }
-
-  return null;
 }
 
 export function buildSubjectKey(

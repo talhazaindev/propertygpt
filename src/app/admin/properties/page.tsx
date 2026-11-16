@@ -254,11 +254,7 @@ export default function PropertyManagement() {
   useEffect(() => {
     const checkTeamMembers = async () => {
       try {
-        const response = await axios.get('/api/admin/team?limit=1', {
-          headers: {
-            'x-admin-auth': 'true'
-          }
-        });
+        const response = await axios.get('/api/admin/team?limit=1');
         
         if (response.data && (!response.data.teamMembers || response.data.teamMembers.length === 0)) {
           setHasTeamMembers(false);
@@ -293,11 +289,7 @@ export default function PropertyManagement() {
       }
       if (searchTerm) params.append("search", searchTerm);
       
-      const response = await axios.get(`/api/admin/properties?${params.toString()}`, {
-        headers: {
-          'x-admin-auth': 'true'
-        }
-      });
+      const response = await axios.get(`/api/admin/properties?${params.toString()}`);
       
       console.log('Fetched properties from API:', response.data.properties);
       setProperties(response.data.properties || []);
@@ -345,7 +337,6 @@ export default function PropertyManagement() {
         },
         {
           headers: {
-            'x-admin-auth': 'true',
             'Content-Type': 'application/json'
           }
         }
@@ -386,10 +377,6 @@ export default function PropertyManagement() {
         id: propertyId,
         status: "REJECTED",
         rejectionReason,
-      }, {
-        headers: {
-          'x-admin-auth': 'true'
-        }
       });
       toast.success("Property rejection recorded");
       fetchProperties();
@@ -404,10 +391,6 @@ export default function PropertyManagement() {
       await axios.put("/api/admin/properties", {
         id: propertyId,
         featured: !featured,
-      }, {
-        headers: {
-          'x-admin-auth': 'true'
-        }
       });
       toast.success(featured ? "Property removed from featured" : "Property marked as featured");
       fetchProperties();
@@ -423,11 +406,7 @@ export default function PropertyManagement() {
     }
     
     try {
-      await axios.delete(`/api/admin/properties?id=${propertyId}`, {
-        headers: {
-          'x-admin-auth': 'true'
-        }
-      });
+      await axios.delete(`/api/admin/properties?id=${propertyId}`);
       toast.success("Property deleted successfully");
       fetchProperties();
     } catch (error) {
@@ -446,7 +425,6 @@ export default function PropertyManagement() {
         },
         {
           headers: {
-            'x-admin-auth': 'true',
             'Content-Type': 'application/json'
           }
         }

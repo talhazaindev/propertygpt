@@ -65,11 +65,7 @@ export default function RequestDetailPage() {
   useEffect(() => {
     const fetchRequest = async () => {
       try {
-        const response = await fetch(`/api/requests/${requestId}`, {
-          headers: {
-            'x-admin-auth': 'true'
-          }
-        });
+        const response = await fetch(`/api/requests/${requestId}`);
         if (!response.ok) {
           throw new Error("Failed to fetch request details");
         }
@@ -98,7 +94,6 @@ export default function RequestDetailPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          'x-admin-auth': 'true'
         },
         body: JSON.stringify({
           status,
@@ -126,10 +121,7 @@ export default function RequestDetailPage() {
     if (confirm("Are you sure you want to delete this request? This action cannot be undone.")) {
       try {
         const response = await fetch(`/api/requests/${requestId}`, {
-          method: "DELETE",
-          headers: {
-            'x-admin-auth': 'true'
-          }
+          method: "DELETE"
         });
 
         if (!response.ok) {

@@ -5,6 +5,11 @@ import { createBlogSchema } from "@/schemas/blog";
 import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import slugify from "slugify";
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 interface BlogDocument {
   _id: ObjectId;
@@ -29,27 +34,6 @@ interface TeamMemberDocument {
   role: string;
   image?: string;
   isActive?: boolean;
-}
-
-async function isAdminOrStaff(req: NextRequest): Promise<boolean> {
-  const session = await getServerSession(authOptions);
-
-  if (session?.user) {
-    if (session.user.role === "ADMIN") return true;
-    if (session.user.isTeamMember) return true;
-    if (
-      typeof session.user.email === "string" &&
-      session.user.email.includes("@propertygpt.com")
-    ) {
-      return true;
-    }
-  }
-
-  if (req.headers.get("x-admin-auth") === "true") {
-    return true;
-  }
-
-  return false;
 }
 
 async function resolveAuthor(
@@ -77,9 +61,7 @@ async function resolveAuthor(
 // GET /api/admin/blogs - Fetch all blogs with pagination
 export async function GET(req: NextRequest) {
   try {
-    if (!(await isAdminOrStaff(req))) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+    await requireStaff();
 
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1");
@@ -160,6 +142,9 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error fetching blogs:", error);
     return NextResponse.json(
       { error: "Failed to fetch blogs" },
@@ -171,9 +156,7 @@ export async function GET(req: NextRequest) {
 // POST /api/admin/blogs - Create a new blog
 export async function POST(req: NextRequest) {
   try {
-    if (!(await isAdminOrStaff(req))) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+    await requireStaff();
 
     const session = await getServerSession(authOptions);
     const body = await req.json();
@@ -266,6 +249,9 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error creating blog:", error);
     return NextResponse.json(
       { error: "Failed to create blog" },

@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
-
-function isAdminOrStaff(request: Request) {
-  return request.headers.get("x-admin-auth") === "true";
-}
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 /** List active agents for assignment dropdowns. */
 export async function GET(request: Request) {
   try {
-    if (!isAdminOrStaff(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    await requireStaff();
 
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get("active") !== "false";
@@ -39,6 +38,9 @@ export async function GET(request: Request) {
       })),
     });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("[ADMIN_AGENTS_LIST_SIMPLE]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

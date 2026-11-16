@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
 import { ObjectId } from "mongodb";
 import { updateBlogSchema } from "@/schemas/blog";
-import { authOptions } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import slugify from "slugify";
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 interface BlogDocument {
   _id: ObjectId;
@@ -30,37 +33,14 @@ interface TeamMemberDocument {
   image?: string;
 }
 
-async function isAdminOrStaff(req: NextRequest): Promise<boolean> {
-  const session = await getServerSession(authOptions);
-
-  if (session?.user) {
-    if (session.user.role === "ADMIN") return true;
-    if (session.user.isTeamMember) return true;
-    if (
-      typeof session.user.email === "string" &&
-      session.user.email.includes("@propertygpt.com")
-    ) {
-      return true;
-    }
-  }
-
-  if (req.headers.get("x-admin-auth") === "true") {
-    return true;
-  }
-
-  return false;
-}
-
 // GET /api/admin/blogs/[id] - Get a specific blog
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireStaff();
     const { id } = await params;
-    if (!(await isAdminOrStaff(req))) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
 
     // Validate object ID
     if (!id || !ObjectId.isValid(id)) {
@@ -115,6 +95,9 @@ export async function GET(
 
     return NextResponse.json(formattedBlog);
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error fetching blog:", error);
     return NextResponse.json(
       { error: "Failed to fetch blog" },
@@ -129,10 +112,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireStaff();
     const { id } = await params;
-    if (!(await isAdminOrStaff(req))) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
 
     // Validate object ID
     if (!id || !ObjectId.isValid(id)) {
@@ -266,6 +247,9 @@ export async function PUT(
 
     return NextResponse.json(formattedBlog);
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error updating blog:", error);
     return NextResponse.json(
       { error: "Failed to update blog" },
@@ -280,10 +264,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireStaff();
     const { id } = await params;
-    if (!(await isAdminOrStaff(req))) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
 
     // Validate object ID
     if (!id || !ObjectId.isValid(id)) {
@@ -318,6 +300,9 @@ export async function DELETE(
       message: "Blog deleted successfully",
     });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error deleting blog:", error);
     return NextResponse.json(
       { error: "Failed to delete blog" },

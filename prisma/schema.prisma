@@ -31,6 +31,7 @@ model User {
   agentActivities AgentActivity[]
   agentTargets   AgentTarget[]
   conversations  Conversation[]
+  mobileSessions MobileSession[]
 }
 
 enum Role {
@@ -392,6 +393,25 @@ model EmailOtp {
   createdAt  DateTime   @default(now())
 
   @@index([email, purpose])
+}
+
+/// Native mobile auth sessions (opaque refresh token + short-lived access JWT).
+model MobileSession {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String    @db.ObjectId
+  user             User      @relation(fields: [userId], references: [id])
+  familyId         String
+  refreshTokenHash String
+  deviceName       String?
+  platform         String?
+  createdAt        DateTime  @default(now())
+  lastUsedAt       DateTime  @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+  @@index([familyId])
 }
 
 enum ConversationSubjectType {

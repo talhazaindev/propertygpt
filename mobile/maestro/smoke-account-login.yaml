@@ -1,0 +1,17 @@
+appId: pk.alwahabco.manzil
+---
+- launchApp
+- tapOn:
+    id: "tab-account"
+- assertVisible:
+    id: "account-screen"
+- tapOn:
+    id: "account-sign-in"
+- assertVisible:
+    id: "login-screen"
+- assertVisible:
+    id: "login-email"
+- assertVisible:
+    id: "login-password"
+- assertVisible:
+    id: "login-submit"

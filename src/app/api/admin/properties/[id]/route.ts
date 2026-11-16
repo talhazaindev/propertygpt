@@ -8,44 +8,18 @@ import {
   sendAgentVerificationSuccessEmail,
   sendPropertyVerifiedEmail,
 } from "@/lib/email";
-
-// Helper function to check if user is admin
-async function isAdminOrStaff(req: NextRequest) {
-  // OPTION 1: Check session-based authentication (NextAuth)
-  const session = await getServerSession(authOptions);
-  console.log("Session in property API:", session);
-  
-  if (session?.user) {
-    // Check if user is admin or staff
-    if (session.user.role === "ADMIN") return true;
-    
-    // Check if user is a team member
-    if (session.user.isTeamMember) return true;
-    
-    // Check if email has company domain
-    if (typeof session.user.email === 'string' && session.user.email.includes("@propertygpt.com")) return true;
-  }
-  
-  // OPTION 2: Check custom admin authentication header (for admin dashboard)
-  const adminAuthHeader = req.headers.get('x-admin-auth');
-  if (adminAuthHeader === 'true') {
-    return true;
-  }
-  
-  return false;
-}
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 // GET /api/admin/properties/:id - Get a property by ID
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    // Check admin access
-    if (!await isAdminOrStaff(request)) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-    
+    await requireStaff();
+
+
     // Get property ID from params
     const { id: propertyId } = await params;
     console.log("Fetching property with ID:", propertyId);
@@ -129,16 +103,61 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     
     // Ensure these required fields exist
     if (!propertyData.images) propertyData.images = [];
-    if (!propertyData.verificationDocuments) propertyData.verificationDocuments = [];
     if (!propertyData.city) propertyData.city = null;
     if (!propertyData.verifiedBy) propertyData.verifiedBy = null;
     if (!propertyData.rejectionReason) propertyData.rejectionReason = null;
-    
-    console.log("Returning property with owner data:", 
-      propertyData.owner ? `Owner: ${propertyData.owner.name}` : "No owner data");
-    
+
+    // Replace durable document URLs with safe metadata + download paths.
+    const {
+      toSafeVerificationDocuments,
+      createSignedDownloadUrl,
+      findVerificationDocument,
+    } = await import("@/lib/verification-documents");
+
+    const safeSellerDocs = toSafeVerificationDocuments(
+      propertyId,
+      propertyData.verificationDocuments
+    );
+    const sellerWithSigned = await Promise.all(
+      safeSellerDocs.map(async (safeDoc) => {
+        const raw = findVerificationDocument(
+          propertyId,
+          propertyData.verificationDocuments,
+          safeDoc.id
+        );
+        const signedUrl = raw ? await createSignedDownloadUrl(raw) : null;
+        return { ...safeDoc, url: signedUrl };
+      })
+    );
+
+    const safeAgentDocs = toSafeVerificationDocuments(
+      propertyId,
+      propertyData.agentVerifiedDocuments
+    );
+    const agentWithSigned = await Promise.all(
+      safeAgentDocs.map(async (safeDoc) => {
+        const raw = findVerificationDocument(
+          propertyId,
+          propertyData.agentVerifiedDocuments,
+          safeDoc.id
+        );
+        const signedUrl = raw ? await createSignedDownloadUrl(raw) : null;
+        return {
+          ...safeDoc,
+          url: signedUrl,
+          downloadPath: `${safeDoc.downloadPath}?source=agent`,
+        };
+      })
+    );
+
+    propertyData.verificationDocuments = sellerWithSigned;
+    propertyData.agentVerifiedDocuments = agentWithSigned;
+
     return NextResponse.json(propertyData);
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error fetching property:", error);
     return NextResponse.json(
       { error: "Failed to fetch property" },
@@ -150,14 +169,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 // PATCH /api/admin/properties/:id - Update property verification status
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    // Check admin access
-    if (!await isAdminOrStaff(request)) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-    
+    await requireStaff();
+
     const { id: propertyId } = await params;
     console.log("PATCH request for property ID:", propertyId);
     
@@ -171,8 +184,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     
     const session = await getServerSession(authOptions);
-    console.log("Session in PATCH request:", session?.user?.email);
-    
     const body = await request.json();
     console.log("Request body:", body);
     
@@ -226,7 +237,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     // verifierId is optional — allow status updates without a team member
-    // (admin panel often authenticates via x-admin-auth without a TeamMember session)
     if (!teamMember && ['VERIFIED', 'ACTIVE', 'HIDDEN', 'REJECTED'].includes(status)) {
       console.warn("No team member found; proceeding without verifierId");
     }
@@ -390,6 +400,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       );
     }
   } catch (error: any) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error updating property:", error);
     console.error("Error details:", error.message);
     if (error.code === "P2025") {
@@ -408,14 +421,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 // PUT /api/admin/properties/:id - Update property details
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    // Check admin access
-    if (!await isAdminOrStaff(request)) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-    
+    await requireStaff();
+
     const { id: propertyId } = await params;
     
     // Validate property ID format
@@ -473,6 +480,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error updating property details:", error);
     return NextResponse.json(
       { error: "Failed to update property details" },
@@ -484,14 +494,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 // DELETE /api/admin/properties/:id - Delete a property
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    // Check admin access
-    if (!await isAdminOrStaff(request)) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-    
+    await requireStaff();
+
     const { id: propertyId } = await params;
     
     // Validate property ID format
@@ -532,6 +536,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       );
     }
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error deleting property:", error);
     return NextResponse.json(
       { error: "Failed to delete property" },

@@ -26,10 +26,12 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        const normalizedEmail = credentials.email.trim().toLowerCase();
+
         // First check if this is a team member/admin login
         const teamMember = await prisma.teamMember.findUnique({
           where: {
-            email: credentials.email,
+            email: normalizedEmail,
           },
         });
 
@@ -37,10 +39,16 @@ export const authOptions: NextAuthOptions = {
           const isValid = await compare(credentials.password, teamMember.hashedPassword);
           if (!isValid) return null;
 
+          if (!teamMember.isActive) {
+            throw new Error(
+              "Your account has been deactivated. Please contact an administrator."
+            );
+          }
+
           return {
             id: teamMember.id,
             name: teamMember.name,
-            email: teamMember.email,
+            email: teamMember.email.trim().toLowerCase(),
             role: teamMember.role,
             isTeamMember: true,
           };
@@ -49,7 +57,7 @@ export const authOptions: NextAuthOptions = {
         // Otherwise check regular user login
         const user = await prisma.user.findUnique({
           where: {
-            email: credentials.email,
+            email: normalizedEmail,
           },
           include: {
             agentProfile: true,

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 // Type for sales data
 interface SaleData {
@@ -23,42 +26,10 @@ interface SaleData {
   status: "PENDING" | "COMPLETED" | "CANCELLED";
 }
 
-// Helper function to check if user is admin
-async function isAdminOrStaff(req: NextRequest) {
-  // OPTION 1: Check session-based authentication (NextAuth)
-  const session = await getServerSession(authOptions);
-  console.log("Session in API:", session);
-  
-  if (session?.user) {
-    // Check if user is admin or staff
-    if (session.user.role === "ADMIN") return true;
-    
-    // Check if user is a team member
-    if (session.user.isTeamMember) return true;
-    
-    // Check if email has company domain
-    if (typeof session.user.email === 'string' && session.user.email.includes("@propertygpt.com")) return true;
-  }
-  
-  // OPTION 2: Check custom admin authentication header (for admin dashboard)
-  const adminAuthHeader = req.headers.get('x-admin-auth');
-  if (adminAuthHeader === 'true') {
-    return true;
-  }
-  
-  return false;
-}
-
 // POST /api/admin/sales/mark-as-sold - Mark a property as sold
 export async function POST(request: NextRequest) {
   try {
-    // Check admin access
-    if (!await isAdminOrStaff(request)) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
+    await requireStaff();
     
     const body = await request.json();
     const { propertyId, buyerId, notes, price, commission } = body;
@@ -124,6 +95,9 @@ export async function POST(request: NextRequest) {
       sale: saleData
     });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("Error marking property as sold:", error);
     return NextResponse.json(
       { error: "Failed to mark property as sold" },

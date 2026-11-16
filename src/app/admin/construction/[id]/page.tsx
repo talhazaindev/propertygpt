@@ -69,11 +69,7 @@ export default function ConstructionRequestDetail() {
   useEffect(() => {
     const fetchRequest = async () => {
       try {
-        const response = await fetch(`/api/construction/${requestId}`, {
-          headers: {
-            'x-admin-auth': 'true'
-          }
-        });
+        const response = await fetch(`/api/construction/${requestId}`);
         
         if (!response.ok) {
           throw new Error("Failed to fetch construction request");
@@ -105,7 +101,6 @@ export default function ConstructionRequestDetail() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          'x-admin-auth': 'true'
         },
         body: JSON.stringify({ status }),
       });

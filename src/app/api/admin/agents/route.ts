@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prismadb";
-
-function isAdminOrStaff(request: Request) {
-  return request.headers.get("x-admin-auth") === "true";
-}
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
 export async function GET(request: Request) {
   try {
-    if (!isAdminOrStaff(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    await requireStaff();
 
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("query") || "";
@@ -97,6 +96,9 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("[ADMIN_AGENTS_GET]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

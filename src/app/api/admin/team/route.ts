@@ -1,30 +1,38 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prismadb";
 import bcrypt from "bcrypt";
+import {
+  requireStaff,
+  StaffAuthError,
+  staffUnauthorizedResponse,
+} from "@/lib/staff-auth";
 
-// Helper function to check admin access
-const isAdminOrStaff = (request: Request) => {
-  const headers = request.headers;
-  return headers.get("x-admin-auth") === "true";
-};
+const ALLOWED_TEAM_ROLES = new Set([
+  "SUPER_ADMIN",
+  "AREA_MANAGER",
+  "PROPERTY_VERIFIER",
+  "CONTENT_CREATOR",
+  "CUSTOMER_SUPPORT",
+  "INVENTORY_MANAGER",
+]);
 
-// GET all team members
 export async function GET(request: Request) {
   try {
-    if (!isAdminOrStaff(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    await requireStaff();
 
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("query") || "";
     const role = searchParams.get("role");
     const isActive = searchParams.get("isActive");
     const cityId = searchParams.get("cityId");
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
-    const skip = (page - 1) * limit;
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = Math.min(
+      Math.max(parseInt(searchParams.get("limit") || "10", 10) || 10, 1),
+      100
+    );
+    const skip = (Math.max(page, 1) - 1) * limit;
 
-    const where: any = {};
+    const where: Record<string, unknown> = {};
 
     if (query) {
       where.OR = [
@@ -46,35 +54,38 @@ export async function GET(request: Request) {
       where.cityId = cityId;
     }
 
-    const teamMembers = await prisma.teamMember.findMany({
-      where,
-      include: {
-        city: {
-          select: {
-            id: true,
-            name: true,
+    const [teamMembers, totalTeamMembers] = await Promise.all([
+      prisma.teamMember.findMany({
+        where,
+        include: {
+          city: {
+            select: { id: true, name: true },
           },
         },
-      },
-      skip,
-      take: limit,
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.teamMember.count({ where }),
+    ]);
 
-    const totalTeamMembers = await prisma.teamMember.count({ where });
+    const safeTeamMembers = teamMembers.map(
+      ({ hashedPassword: _, ...rest }) => rest
+    );
 
     return NextResponse.json({
-      teamMembers,
+      teamMembers: safeTeamMembers,
       pagination: {
         total: totalTeamMembers,
         pages: Math.ceil(totalTeamMembers / limit),
-        page,
+        page: Math.max(page, 1),
         limit,
       },
     });
   } catch (error) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("[ADMIN_TEAM_GET]", error);
     return NextResponse.json(
       { error: "Internal server error" },
@@ -83,12 +94,9 @@ export async function GET(request: Request) {
   }
 }
 
-// CREATE a new team member
 export async function POST(request: Request) {
   try {
-    if (!isAdminOrStaff(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    await requireStaff();
 
     const body = await request.json();
     const {
@@ -108,8 +116,14 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!ALLOWED_TEAM_ROLES.has(role)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+
     const existingTeamMember = await prisma.teamMember.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (existingTeamMember) {
@@ -145,7 +159,7 @@ export async function POST(request: Request) {
     const teamMember = await prisma.teamMember.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         hashedPassword,
         role,
         ...(phoneNumber && { phoneNumber }),
@@ -154,20 +168,21 @@ export async function POST(request: Request) {
       },
       include: {
         city: {
-          select: {
-            id: true,
-            name: true,
-          },
+          select: { id: true, name: true },
         },
       },
     });
 
     const { hashedPassword: _, ...safeTeamMember } = teamMember;
     return NextResponse.json(safeTeamMember, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof StaffAuthError) {
+      return staffUnauthorizedResponse(error);
+    }
     console.error("[ADMIN_TEAM_POST]", error);
 
-    if (error?.code === "P2031") {
+    const prismaError = error as { code?: string; message?: string };
+    if (prismaError?.code === "P2031") {
       return NextResponse.json(
         {
           error:
@@ -178,7 +193,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      { error: prismaError.message || "Internal server error" },
       { status: 500 }
     );
   }

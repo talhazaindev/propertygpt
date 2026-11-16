@@ -1,0 +1,9 @@
+appId: pk.alwahabco.manzil
+---
+- launchApp
+- tapOn:
+    id: "tab-account"
+- assertVisible:
+    id: "account-privacy-link"
+- assertVisible:
+    id: "account-terms-link"
