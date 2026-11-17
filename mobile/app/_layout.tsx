@@ -90,6 +90,7 @@ function RootLayout() {
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="property/[id]" options={{ title: "Property" }} />
+          <Stack.Screen name="favorites" options={{ title: "Favorites" }} />
           <Stack.Screen name="listing/create" options={{ title: "List a property" }} />
           <Stack.Screen name="request/create" options={{ title: "Request a property" }} />
           <Stack.Screen

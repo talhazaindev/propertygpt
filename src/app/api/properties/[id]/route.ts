@@ -470,6 +470,11 @@ export async function DELETE(
       );
     }
 
+    // Drop any saved favorites pointing at this listing.
+    await db.collection("Favorite").deleteMany({
+      $or: [{ propertyId: id }, { propertyId: new ObjectId(id) }],
+    });
+
     return NextResponse.json({
       message: "Property deleted successfully",
       id,

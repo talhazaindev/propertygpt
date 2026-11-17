@@ -32,6 +32,7 @@ model User {
   agentTargets   AgentTarget[]
   conversations  Conversation[]
   mobileSessions MobileSession[]
+  favorites      Favorite[]
 }
 
 enum Role {
@@ -186,6 +187,22 @@ model Property {
   
   // Status history
   statusHistory Json[]
+
+  favorites Favorite[]
+}
+
+/// Saved listings for buyers (favorites).
+model Favorite {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id])
+  propertyId String   @db.ObjectId
+  property   Property @relation(fields: [propertyId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, propertyId])
+  @@index([userId, createdAt])
+  @@index([propertyId])
 }
 
 model Sale {

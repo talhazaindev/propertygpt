@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { Video } from "lucide-react-native";
 import { VerifiedBadge } from "@/src/components/ui/VerifiedBadge";
+import { FavoriteButton } from "@/src/components/property/FavoriteButton";
 import type { PropertyListItem } from "@/src/services/api/properties";
 import { isVideoUrl } from "@/src/services/upload/uploadthing";
 import { formatPrice } from "@/src/utils/format";
@@ -11,9 +12,15 @@ import { colors, elevation, radii, spacing, typography } from "@/src/theme";
 type PropertyCardProps = {
   item: PropertyListItem;
   onPress?: () => void;
+  /** Show save-heart overlay (default true). */
+  showFavorite?: boolean;
 };
 
-function PropertyCardComponent({ item, onPress }: PropertyCardProps) {
+function PropertyCardComponent({
+  item,
+  onPress,
+  showFavorite = true,
+}: PropertyCardProps) {
   const cover =
     item.images?.find((uri) => !isVideoUrl(uri)) || item.images?.[0];
   const coverIsVideo = Boolean(cover && isVideoUrl(cover));
@@ -64,6 +71,11 @@ function PropertyCardComponent({ item, onPress }: PropertyCardProps) {
         {verified ? (
           <View style={styles.badgeFloat}>
             <VerifiedBadge label="Verified" />
+          </View>
+        ) : null}
+        {showFavorite ? (
+          <View style={styles.favoriteFloat}>
+            <FavoriteButton propertyId={item.id} overlay size={18} />
           </View>
         ) : null}
       </View>
@@ -146,6 +158,12 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: spacing.md,
     left: spacing.md,
+  },
+  favoriteFloat: {
+    position: "absolute",
+    top: spacing.sm,
+    right: spacing.sm,
+    zIndex: 2,
   },
   cardBody: {
     padding: spacing.md,

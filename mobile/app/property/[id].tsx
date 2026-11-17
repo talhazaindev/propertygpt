@@ -23,6 +23,7 @@ import { SecondaryButton } from "@/src/components/ui/SecondaryButton";
 import { ScreenContainer } from "@/src/components/ui/ScreenContainer";
 import { StateBlock } from "@/src/components/ui/StateBlock";
 import { VerifiedBadge } from "@/src/components/ui/VerifiedBadge";
+import { FavoriteButton } from "@/src/components/property/FavoriteButton";
 import { SERVER_ORIGIN } from "@/src/config/env";
 import { getApiErrorMessage } from "@/src/services/api/client";
 import { fetchPropertyById } from "@/src/services/api/properties";
@@ -135,15 +136,22 @@ export default function PropertyDetailScreen() {
         options={{
           title: property.title,
           headerRight: () => (
-            <Pressable
-              onPress={() => void onShare()}
-              accessibilityRole="button"
-              accessibilityLabel="Share listing"
-              style={styles.shareHeader}
-              testID="property-share"
-            >
-              <Share2 size={20} color={colors.primaryDark} />
-            </Pressable>
+            <View style={styles.headerActions}>
+              <FavoriteButton
+                propertyId={property.id}
+                size={18}
+                testID="property-favorite"
+              />
+              <Pressable
+                onPress={() => void onShare()}
+                accessibilityRole="button"
+                accessibilityLabel="Share listing"
+                style={styles.shareHeader}
+                testID="property-share"
+              >
+                <Share2 size={20} color={colors.primaryDark} />
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -158,30 +166,35 @@ export default function PropertyDetailScreen() {
           />
         }
       >
-        {images.length > 0 ? (
-          <FlatList
-            ref={galleryRef}
-            data={images}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(uri, index) => `${uri}-${index}`}
-            onMomentumScrollEnd={onMomentumEnd}
-            renderItem={({ item: uri }) => (
-              <GallerySlide uri={uri} active={images[imageIndex] === uri} />
-            )}
-            style={styles.gallery}
-            getItemLayout={(_, index) => ({
-              length: width,
-              offset: width * index,
-              index,
-            })}
-          />
-        ) : (
-          <View style={[styles.hero, styles.heroFallback]}>
-            <Text style={styles.fallbackText}>No photos</Text>
+        <View>
+          {images.length > 0 ? (
+            <FlatList
+              ref={galleryRef}
+              data={images}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(uri, index) => `${uri}-${index}`}
+              onMomentumScrollEnd={onMomentumEnd}
+              renderItem={({ item: uri }) => (
+                <GallerySlide uri={uri} active={images[imageIndex] === uri} />
+              )}
+              style={styles.gallery}
+              getItemLayout={(_, index) => ({
+                length: width,
+                offset: width * index,
+                index,
+              })}
+            />
+          ) : (
+            <View style={[styles.hero, styles.heroFallback]}>
+              <Text style={styles.fallbackText}>No photos</Text>
+            </View>
+          )}
+          <View style={styles.galleryFavorite}>
+            <FavoriteButton propertyId={property.id} overlay />
           </View>
-        )}
+        </View>
 
         {images.length > 1 ? (
           <View style={styles.pagerRow}>
@@ -528,10 +541,21 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     marginTop: spacing.xs,
   },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
   shareHeader: {
     paddingHorizontal: spacing.sm,
     minHeight: 44,
     justifyContent: "center",
+  },
+  galleryFavorite: {
+    position: "absolute",
+    top: spacing.md,
+    right: spacing.md,
+    zIndex: 3,
   },
   error: {
     color: colors.destructive,

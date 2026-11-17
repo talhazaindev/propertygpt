@@ -129,6 +129,12 @@ export default function AccountScreen() {
         testID="account-edit-profile"
       />
       <SecondaryButton
+        label="Favorites"
+        onPress={() => router.push("/favorites")}
+        style={styles.secondaryCta}
+        testID="account-favorites"
+      />
+      <SecondaryButton
         label="My listings"
         onPress={() => router.push("/(tabs)/sell")}
         style={styles.secondaryCta}

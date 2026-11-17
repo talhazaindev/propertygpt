@@ -44,10 +44,12 @@ export default function DashboardPage() {
       }
 
       try {
-        const [propertiesRes, conversationsRes] = await Promise.all([
-          axios.get(`/api/properties?userId=${user.id}&limit=1`),
-          axios.get("/api/messages/conversations").catch(() => null),
-        ]);
+        const [propertiesRes, conversationsRes, favoritesRes] =
+          await Promise.all([
+            axios.get(`/api/properties?userId=${user.id}&limit=1`),
+            axios.get("/api/messages/conversations").catch(() => null),
+            axios.get("/api/favorites/ids").catch(() => null),
+          ]);
         const listingsActive =
           propertiesRes.data?.pagination?.total ??
           propertiesRes.data?.total ??
@@ -64,7 +66,9 @@ export default function DashboardPage() {
 
         setStats({
           totalViews: 0,
-          savedProperties: 0,
+          savedProperties: Array.isArray(favoritesRes?.data?.ids)
+            ? favoritesRes.data.ids.length
+            : 0,
           messages: unread,
           listingsActive,
         });

@@ -251,8 +251,18 @@ export async function DELETE(req: NextRequest) {
           { propertyId: { $in: ownedIds.map((id) => id.toString()) } },
         ],
       });
+      await db.collection("Favorite").deleteMany({
+        $or: [
+          { propertyId: { $in: ownedIds } },
+          { propertyId: { $in: ownedIds.map((id) => id.toString()) } },
+        ],
+      });
       await db.collection("Property").deleteMany({ _id: { $in: ownedIds } });
     }
+
+    await db.collection("Favorite").deleteMany({
+      $or: [{ userId: user.id }, { userId: userOid }],
+    });
 
     await db.collection("Sale").deleteMany({
       $or: [
