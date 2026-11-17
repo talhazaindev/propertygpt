@@ -57,8 +57,12 @@ async function requireUserId(req: Request): Promise<string> {
 export const ourFileRouter = {
   propertyImages: f({
     image: {
-      maxFileSize: "4MB",
+      maxFileSize: "8MB",
       maxFileCount: 10,
+    },
+    video: {
+      maxFileSize: "64MB",
+      maxFileCount: 3,
     },
   })
     .middleware(async ({ req }) => {
@@ -70,6 +74,7 @@ export const ourFileRouter = {
         uploadedBy: metadata.userId,
         url: file.ufsUrl,
         name: file.name,
+        type: file.type,
       };
     }),
 

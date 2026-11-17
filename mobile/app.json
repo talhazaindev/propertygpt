@@ -7,6 +7,11 @@
     "icon": "./assets/images/icon.png",
     "scheme": "manzil",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#faf8f3"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "pk.alwahabco.manzil"
@@ -30,16 +35,25 @@
       "expo-router",
       "expo-secure-store",
       "expo-font",
-      "expo-image-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Manzil to access your photos and videos for listing uploads.",
+          "cameraPermission": "Allow Manzil to take photos and videos for listing uploads.",
+          "microphonePermission": "Allow Manzil to record audio when capturing listing videos."
+        }
+      ],
       "expo-document-picker",
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
+          "imageWidth": 220,
           "resizeMode": "contain",
           "backgroundColor": "#faf8f3"
         }
       ],
+      "expo-image",
       "@sentry/react-native"
     ],
     "experiments": {

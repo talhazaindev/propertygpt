@@ -11,12 +11,14 @@ import {
 } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
+import { Video } from "lucide-react-native";
 import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
 import { ScreenContainer } from "@/src/components/ui/ScreenContainer";
 import { StateBlock } from "@/src/components/ui/StateBlock";
 import { VerifiedBadge } from "@/src/components/ui/VerifiedBadge";
 import { getApiErrorMessage } from "@/src/services/api/client";
 import { fetchPropertyById } from "@/src/services/api/properties";
+import { isVideoUrl } from "@/src/services/upload/uploadthing";
 import { formatArea, formatPrice, telUrl, whatsappUrl } from "@/src/utils/format";
 import { colors, radii, spacing, typography } from "@/src/theme";
 
@@ -92,8 +94,18 @@ export default function PropertyDetailScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {activeImage ? (
+        {activeImage && !isVideoUrl(activeImage) ? (
           <Image source={{ uri: activeImage }} style={styles.hero} />
+        ) : activeImage && isVideoUrl(activeImage) ? (
+          <Pressable
+            style={[styles.hero, styles.heroVideo]}
+            onPress={() => void Linking.openURL(activeImage)}
+            accessibilityRole="button"
+            accessibilityLabel="Play listing video"
+          >
+            <Video size={36} color={colors.primaryForeground} />
+            <Text style={styles.heroVideoLabel}>Tap to play video</Text>
+          </Pressable>
         ) : (
           <View style={[styles.hero, styles.heroFallback]}>
             <Text style={styles.fallbackText}>No photos</Text>
@@ -106,20 +118,29 @@ export default function PropertyDetailScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.thumbs}
           >
-            {images.map((uri, index) => (
-              <Pressable
-                key={`${uri}-${index}`}
-                onPress={() => setImageIndex(index)}
-                accessibilityRole="button"
-                accessibilityLabel={`Photo ${index + 1}`}
-                style={[
-                  styles.thumb,
-                  index === imageIndex ? styles.thumbActive : null,
-                ]}
-              >
-                <Image source={{ uri }} style={styles.thumbImage} />
-              </Pressable>
-            ))}
+            {images.map((uri, index) => {
+              const video = isVideoUrl(uri);
+              return (
+                <Pressable
+                  key={`${uri}-${index}`}
+                  onPress={() => setImageIndex(index)}
+                  accessibilityRole="button"
+                  accessibilityLabel={video ? `Video ${index + 1}` : `Photo ${index + 1}`}
+                  style={[
+                    styles.thumb,
+                    index === imageIndex ? styles.thumbActive : null,
+                  ]}
+                >
+                  {video ? (
+                    <View style={[styles.thumbImage, styles.thumbVideo]}>
+                      <Video size={16} color={colors.primaryForeground} />
+                    </View>
+                  ) : (
+                    <Image source={{ uri }} style={styles.thumbImage} />
+                  )}
+                </Pressable>
+              );
+            })}
           </ScrollView>
         ) : null}
 
@@ -216,6 +237,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  heroVideo: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.primaryDark,
+  },
+  heroVideoLabel: {
+    color: colors.primaryForeground,
+    fontFamily: typography.fonts.sansSemibold,
+    fontSize: typography.sizes.sm,
+  },
   fallbackText: {
     color: colors.mutedForeground,
     fontFamily: typography.fonts.sans,
@@ -239,6 +271,11 @@ const styles = StyleSheet.create({
   thumbImage: {
     width: "100%",
     height: "100%",
+  },
+  thumbVideo: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primaryDark,
   },
   headerRow: {
     flexDirection: "row",

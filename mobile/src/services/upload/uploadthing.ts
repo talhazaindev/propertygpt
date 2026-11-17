@@ -29,8 +29,29 @@ export const { useImageUploader, useDocumentUploader, uploadFiles } =
     },
   });
 
+export type MediaKind = "image" | "video";
+
 export type UploadedMedia = {
   url: string;
   key?: string;
   name: string;
+  kind: MediaKind;
 };
+
+export function detectMediaKind(input: {
+  url?: string;
+  name?: string;
+  type?: string;
+}): MediaKind {
+  const type = (input.type || "").toLowerCase();
+  if (type.startsWith("video/")) return "video";
+  if (type.startsWith("image/")) return "image";
+
+  const name = `${input.name || ""} ${input.url || ""}`.toLowerCase();
+  if (/\.(mp4|mov|m4v|webm|avi)(\?|$)/.test(name)) return "video";
+  return "image";
+}
+
+export function isVideoUrl(url: string): boolean {
+  return detectMediaKind({ url }) === "video";
+}

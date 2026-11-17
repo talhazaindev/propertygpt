@@ -13,13 +13,16 @@ import {
 import { openSettings } from "expo-linking";
 import { router } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Camera, ImagePlus, Video } from "lucide-react-native";
 import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
+import { SecondaryButton } from "@/src/components/ui/SecondaryButton";
 import { ScreenContainer } from "@/src/components/ui/ScreenContainer";
 import { apiClient, getApiErrorMessage } from "@/src/services/api/client";
 import { fetchCities } from "@/src/services/api/properties";
+import { captureAndUploadMedia } from "@/src/services/upload/captureMedia";
 import {
+  detectMediaKind,
   useDocumentUploader,
-  useImageUploader,
   type UploadedMedia,
 } from "@/src/services/upload/uploadthing";
 import { useAuthStore } from "@/src/store/authStore";
@@ -44,13 +47,17 @@ type DocType = (typeof DOC_TYPES)[number];
 
 type UploadedDoc = UploadedMedia & { type: DocType };
 
-function uploadedUrl(file: {
+const MAX_IMAGES = 10;
+const MAX_VIDEOS = 3;
+
+function uploadedDoc(file: {
   ufsUrl?: string;
   url?: string;
   appUrl?: string;
   key?: string;
   name?: string;
-  serverData?: { url?: string; key?: string; name?: string };
+  type?: string;
+  serverData?: { url?: string; key?: string; name?: string; type?: string };
 }): UploadedMedia | null {
   const url =
     file.ufsUrl ||
@@ -63,7 +70,25 @@ function uploadedUrl(file: {
     url: url || "",
     key: file.key || file.serverData?.key,
     name: file.name || file.serverData?.name || "file",
+    kind: detectMediaKind({
+      url,
+      name: file.name || file.serverData?.name,
+      type: file.type || file.serverData?.type,
+    }),
   };
+}
+
+function permissionAlert(kind: "photo" | "video" | "library"): void {
+  const message =
+    kind === "library"
+      ? "Allow photo library access to upload listing media."
+      : kind === "video"
+        ? "Allow camera and microphone access to record listing videos."
+        : "Allow camera access to take listing photos.";
+  Alert.alert("Permission needed", message, [
+    { text: "Dismiss" },
+    { text: "Open Settings", onPress: () => void openSettings() },
+  ]);
 }
 
 export default function CreateListingScreen() {
@@ -84,35 +109,19 @@ export default function CreateListingScreen() {
   const [type, setType] = useState<(typeof PROPERTY_TYPES)[number]>("HOUSE");
   const [listingType, setListingType] = useState<"SALE" | "RENTAL">("SALE");
   const [cityId, setCityId] = useState<string>("");
-  const [images, setImages] = useState<UploadedMedia[]>([]);
+  const [media, setMedia] = useState<UploadedMedia[]>([]);
   const [docs, setDocs] = useState<UploadedDoc[]>([]);
   const [pendingDocType, setPendingDocType] = useState<DocType>("CNIC");
   const [loading, setLoading] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const { openImagePicker, isUploading: uploadingImages } = useImageUploader(
-    "propertyImages",
-    {
-      onClientUploadComplete: (files) => {
-        const next = (files || [])
-          .map((file) => uploadedUrl(file as never))
-          .filter((item): item is UploadedMedia => Boolean(item));
-        if (next.length) {
-          setImages((prev) => [...prev, ...next].slice(0, 10));
-        }
-      },
-      onUploadError: (err) => {
-        setError(err.message || "Image upload failed");
-      },
-    }
-  );
 
   const { openDocumentPicker, isUploading: uploadingDocs } = useDocumentUploader(
     "verificationDocuments",
     {
       onClientUploadComplete: (files) => {
         const uploaded = (files || [])
-          .map((file) => uploadedUrl(file as never))
+          .map((file) => uploadedDoc(file as never))
           .filter((item): item is UploadedMedia => Boolean(item));
         if (!uploaded.length) {
           setError("Document upload failed");
@@ -130,7 +139,59 @@ export default function CreateListingScreen() {
   );
 
   const cityOptions = useMemo(() => cities.data ?? [], [cities.data]);
-  const busy = loading || uploadingImages || uploadingDocs;
+  const imageCount = media.filter((item) => item.kind === "image").length;
+  const videoCount = media.filter((item) => item.kind === "video").length;
+  const busy = loading || uploadingMedia || uploadingDocs;
+
+  async function handleCapture(
+    mode: "photo" | "video",
+    source: "camera" | "library"
+  ): Promise<void> {
+    setError(null);
+    if (mode === "photo" && imageCount >= MAX_IMAGES) {
+      setError(`You can upload up to ${MAX_IMAGES} photos`);
+      return;
+    }
+    if (mode === "video" && videoCount >= MAX_VIDEOS) {
+      setError(`You can upload up to ${MAX_VIDEOS} videos`);
+      return;
+    }
+
+    setUploadingMedia(true);
+    try {
+      const result = await captureAndUploadMedia({ mode, source });
+      if (result.status === "permission_denied") {
+        permissionAlert(source === "library" ? "library" : mode);
+        return;
+      }
+      if (result.status === "cancelled") return;
+      if (result.status === "error") {
+        setError(result.message);
+        return;
+      }
+
+      setMedia((prev) => {
+        const next = [...prev];
+        for (const file of result.files) {
+          if (file.kind === "video") {
+            if (next.filter((item) => item.kind === "video").length >= MAX_VIDEOS) {
+              continue;
+            }
+          } else if (next.filter((item) => item.kind === "image").length >= MAX_IMAGES) {
+            continue;
+          }
+          next.push(file);
+        }
+        return next;
+      });
+    } finally {
+      setUploadingMedia(false);
+    }
+  }
+
+  function removeMedia(index: number): void {
+    setMedia((prev) => prev.filter((_, i) => i !== index));
+  }
 
   if (!user) {
     return (
@@ -161,7 +222,7 @@ export default function CreateListingScreen() {
       setError("Enter a valid area");
       return;
     }
-    if (images.length === 0) {
+    if (imageCount === 0) {
       setError("Add at least one property photo");
       return;
     }
@@ -183,7 +244,13 @@ export default function CreateListingScreen() {
         area: areaNum,
         address: address.trim(),
         cityId,
-        imageUrls: images.map((item) => item.url).filter(Boolean),
+        // Photos first, then videos — detail UI can detect video by extension.
+        imageUrls: [
+          ...media.filter((item) => item.kind === "image"),
+          ...media.filter((item) => item.kind === "video"),
+        ]
+          .map((item) => item.url)
+          .filter(Boolean),
         verificationDocuments: docs.map((doc) => ({
           type: doc.type,
           url: doc.url,
@@ -205,14 +272,15 @@ export default function CreateListingScreen() {
   }
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer scroll atmosphere="hero">
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.wrap}
       >
         <Text style={styles.title}>List a property</Text>
         <Text style={styles.subtitle}>
-          Photos and ownership documents are required before review.
+          Capture photos or short videos on site, then attach ownership documents
+          for verification.
         </Text>
 
         <Field label="Title" value={title} onChangeText={setTitle} />
@@ -284,33 +352,62 @@ export default function CreateListingScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Photos ({images.length}/10)</Text>
-        <View style={styles.row}>
-          <PrimaryButton
-            label={uploadingImages ? "Uploading…" : "Add from library"}
-            disabled={busy || images.length >= 10}
-            onPress={() => {
-              void openImagePicker({
-                source: "library",
-                onInsufficientPermissions: () => {
-                  Alert.alert(
-                    "Photos permission needed",
-                    "Allow photo library access to upload listing images.",
-                    [
-                      { text: "Dismiss" },
-                      { text: "Open Settings", onPress: () => void openSettings() },
-                    ]
-                  );
-                },
-              });
-            }}
+        <Text style={styles.label}>
+          Media ({imageCount}/{MAX_IMAGES} photos · {videoCount}/{MAX_VIDEOS} videos)
+        </Text>
+        <View style={styles.mediaActions}>
+          <MediaAction
+            label={uploadingMedia ? "Uploading…" : "Take photo"}
+            Icon={Camera}
+            disabled={busy || imageCount >= MAX_IMAGES}
+            onPress={() => void handleCapture("photo", "camera")}
+          />
+          <MediaAction
+            label="Photo library"
+            Icon={ImagePlus}
+            disabled={busy || imageCount >= MAX_IMAGES}
+            onPress={() => void handleCapture("photo", "library")}
+          />
+          <MediaAction
+            label="Record video"
+            Icon={Video}
+            disabled={busy || videoCount >= MAX_VIDEOS}
+            onPress={() => void handleCapture("video", "camera")}
+          />
+          <MediaAction
+            label="Video library"
+            Icon={Video}
+            disabled={busy || videoCount >= MAX_VIDEOS}
+            onPress={() => void handleCapture("video", "library")}
           />
         </View>
+
         <View style={styles.previewRow}>
-          {images.map((item) => (
-            <Image key={item.url || item.key} source={{ uri: item.url }} style={styles.preview} />
+          {media.map((item, index) => (
+            <Pressable
+              key={`${item.url || item.key}-${index}`}
+              onLongPress={() => removeMedia(index)}
+              accessibilityLabel={
+                item.kind === "video"
+                  ? `Video ${item.name}. Long press to remove.`
+                  : `Photo ${item.name}. Long press to remove.`
+              }
+              style={styles.previewCard}
+            >
+              {item.kind === "video" ? (
+                <View style={[styles.preview, styles.videoPreview]}>
+                  <Video size={22} color={colors.primaryForeground} />
+                  <Text style={styles.videoLabel}>Video</Text>
+                </View>
+              ) : (
+                <Image source={{ uri: item.url }} style={styles.preview} />
+              )}
+            </Pressable>
           ))}
         </View>
+        {media.length > 0 ? (
+          <Text style={styles.hint}>Long-press a thumbnail to remove it.</Text>
+        ) : null}
 
         <Text style={styles.label}>Verification documents</Text>
         <View style={styles.rowWrap}>
@@ -343,8 +440,36 @@ export default function CreateListingScreen() {
           loading={busy}
           onPress={onSubmit}
         />
+        <SecondaryButton
+          label="Cancel"
+          disabled={busy}
+          onPress={() => router.back()}
+          style={styles.cancel}
+        />
       </KeyboardAvoidingView>
     </ScreenContainer>
+  );
+}
+
+function MediaAction(props: {
+  label: string;
+  Icon: typeof Camera;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  const { Icon } = props;
+  return (
+    <Pressable
+      onPress={props.onPress}
+      disabled={props.disabled}
+      style={[styles.mediaBtn, props.disabled ? styles.mediaBtnDisabled : null]}
+      accessibilityRole="button"
+      accessibilityLabel={props.label}
+      accessibilityState={{ disabled: Boolean(props.disabled) }}
+    >
+      <Icon size={18} color={colors.primary} />
+      <Text style={styles.mediaBtnLabel}>{props.label}</Text>
+    </Pressable>
   );
 }
 
@@ -404,6 +529,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fonts.sans,
     fontSize: typography.sizes.sm,
     marginBottom: spacing.sm,
+    lineHeight: 20,
   },
   field: {
     gap: spacing.xs,
@@ -459,16 +585,65 @@ const styles = StyleSheet.create({
   chipLabelActive: {
     color: colors.primaryForeground,
   },
+  mediaActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  mediaBtn: {
+    minWidth: "47%",
+    flexGrow: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    minHeight: 48,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: radii.lg,
+    backgroundColor: colors.card,
+    paddingHorizontal: spacing.md,
+  },
+  mediaBtnDisabled: {
+    opacity: 0.45,
+  },
+  mediaBtnLabel: {
+    color: colors.primary,
+    fontFamily: typography.fonts.sansSemibold,
+    fontSize: typography.sizes.sm,
+  },
   previewRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
   },
+  previewCard: {
+    borderRadius: radii.md,
+    overflow: "hidden",
+  },
   preview: {
-    width: 72,
-    height: 72,
+    width: 84,
+    height: 84,
     borderRadius: radii.md,
     backgroundColor: colors.muted,
+  },
+  videoPreview: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    backgroundColor: colors.primaryDark,
+  },
+  videoLabel: {
+    color: colors.primaryForeground,
+    fontFamily: typography.fonts.sansSemibold,
+    fontSize: 10,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  hint: {
+    color: colors.mutedForeground,
+    fontFamily: typography.fonts.sans,
+    fontSize: typography.sizes.xs,
   },
   docLine: {
     color: colors.mutedForeground,
@@ -483,5 +658,8 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     fontFamily: typography.fonts.sans,
     marginBottom: spacing.lg,
+  },
+  cancel: {
+    marginTop: spacing.xs,
   },
 });
