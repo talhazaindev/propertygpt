@@ -1,6 +1,14 @@
 import { z } from "zod";
+import { isAllowedMediaUrl } from "@/lib/media-url";
 
 export const propertyTypes = ["APARTMENT", "HOUSE", "VILLA", "LAND", "COMMERCIAL"] as const;
+
+const mediaUrlSchema = z
+  .string()
+  .min(1)
+  .refine(isAllowedMediaUrl, {
+    message: "Media URL must be an https UploadThing link or /images path",
+  });
 
 export const propertyStatusOptions = [
   "PENDING",
@@ -165,17 +173,34 @@ export const propertySchema = z.object({
   cityId: z.string({
     required_error: "City is required",
   }),
-  imageUrls: z.array(z.string()).min(1, "At least one property image is required"),
+  imageUrls: z
+    .array(mediaUrlSchema)
+    .min(1, "At least one property image is required"),
   verificationDocuments: z
     .array(
       z.object({
         type: z.enum(verificationDocumentTypes),
-        url: z.string().min(1),
+        url: mediaUrlSchema,
         fileName: z.string().min(1),
         uploadedAt: z.union([z.string(), z.date()]).optional(),
       })
     )
     .min(1, "At least one verification document is required"),
+});
+
+/** Owner JSON PATCH body for mobile / API clients. */
+export const propertyOwnerUpdateSchema = z.object({
+  title: z.string().min(10).max(100).optional(),
+  description: z.string().min(50).max(2000).optional(),
+  price: z.number().positive().optional(),
+  type: z.enum(propertyTypes).optional(),
+  listingType: z.enum(propertyListingTypes).optional(),
+  bedrooms: z.number().int().positive().nullable().optional(),
+  bathrooms: z.number().int().positive().nullable().optional(),
+  area: z.number().positive().optional(),
+  address: z.string().min(5).max(200).optional(),
+  cityId: z.string().min(1).optional(),
+  imageUrls: z.array(mediaUrlSchema).min(1).optional(),
 });
 
 // Search schema for property filtering

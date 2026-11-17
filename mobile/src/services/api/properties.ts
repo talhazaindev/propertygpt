@@ -45,10 +45,31 @@ export type PropertyListResponse = {
   };
 };
 
+export type PropertyTypeFilter =
+  | "ALL"
+  | "HOUSE"
+  | "APARTMENT"
+  | "VILLA"
+  | "LAND"
+  | "COMMERCIAL";
+
+export type SortOption = "newest" | "oldest" | "price_low" | "price_high";
+
+export type MyListingStatusFilter =
+  | "ALL"
+  | "PENDING"
+  | "VERIFIED"
+  | "REJECTED"
+  | "ACTIVE"
+  | "SOLD"
+  | "HIDDEN";
+
 export async function fetchProperties(params: {
   listingType?: "SALE" | "RENTAL";
+  type?: Exclude<PropertyTypeFilter, "ALL">;
+  bedrooms?: number;
   search?: string;
-  sortBy?: "newest" | "oldest" | "price_low" | "price_high";
+  sortBy?: SortOption;
   featured?: boolean;
   page?: number;
   limit?: number;
@@ -56,6 +77,8 @@ export async function fetchProperties(params: {
   const { data } = await apiClient.get<PropertyListResponse>("/api/properties", {
     params: {
       listingType: params.listingType,
+      type: params.type,
+      bedrooms: params.bedrooms,
       search: params.search || undefined,
       sortBy: params.sortBy || "newest",
       featured: params.featured ? "true" : undefined,
@@ -73,7 +96,7 @@ export async function fetchPropertyById(id: string): Promise<PropertyDetail> {
 }
 
 export async function fetchMyProperties(params?: {
-  status?: string;
+  status?: Exclude<MyListingStatusFilter, "ALL"> | string;
   page?: number;
   limit?: number;
 }): Promise<PropertyListResponse> {
@@ -92,4 +115,29 @@ export async function fetchCities(): Promise<
 > {
   const { data } = await apiClient.get("/api/cities");
   return Array.isArray(data) ? data : [];
+}
+
+export type PropertyOwnerUpdatePayload = {
+  title?: string;
+  description?: string;
+  price?: number;
+  type?: string;
+  listingType?: "SALE" | "RENTAL";
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  area?: number;
+  address?: string;
+  cityId?: string;
+  imageUrls?: string[];
+};
+
+export async function updateProperty(
+  id: string,
+  payload: PropertyOwnerUpdatePayload
+): Promise<void> {
+  await apiClient.patch(`/api/properties/${encodeURIComponent(id)}`, payload);
+}
+
+export async function deleteProperty(id: string): Promise<void> {
+  await apiClient.delete(`/api/properties/${encodeURIComponent(id)}`);
 }

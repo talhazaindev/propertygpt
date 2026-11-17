@@ -1,37 +1,52 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
-  Image,
+  FlatList,
   Linking,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
+  RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Image } from "expo-image";
+import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Video } from "lucide-react-native";
+import { useVideoPlayer, VideoView } from "expo-video";
+import { Share2, Video as VideoIcon } from "lucide-react-native";
 import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
+import { SecondaryButton } from "@/src/components/ui/SecondaryButton";
 import { ScreenContainer } from "@/src/components/ui/ScreenContainer";
 import { StateBlock } from "@/src/components/ui/StateBlock";
 import { VerifiedBadge } from "@/src/components/ui/VerifiedBadge";
+import { SERVER_ORIGIN } from "@/src/config/env";
 import { getApiErrorMessage } from "@/src/services/api/client";
 import { fetchPropertyById } from "@/src/services/api/properties";
-import { isVideoUrl } from "@/src/services/upload/uploadthing";
+import {
+  isSafeExternalMediaUrl,
+  isVideoUrl,
+} from "@/src/services/upload/uploadthing";
+import { useAuthStore } from "@/src/store/authStore";
 import { formatArea, formatPrice, telUrl, whatsappUrl } from "@/src/utils/format";
 import { colors, radii, spacing, typography } from "@/src/theme";
 
 const width = Dimensions.get("window").width;
+const heroHeight = Math.round(width * 0.72);
 
 export default function PropertyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const propertyId = Array.isArray(id) ? id[0] : id;
+  const user = useAuthStore((s) => s.user);
   const [imageIndex, setImageIndex] = useState(0);
+  const galleryRef = useRef<FlatList<string>>(null);
 
   const query = useQuery({
     queryKey: ["property", propertyId],
-    queryFn: () => fetchPropertyById(propertyId),
+    queryFn: () => fetchPropertyById(propertyId as string),
     enabled: Boolean(propertyId),
   });
 
@@ -52,6 +67,34 @@ export default function PropertyDetailScreen() {
     query.data
       ? `Hi, I'm interested in "${query.data.title}" on Manzil.`
       : undefined
+  );
+
+  const isOwner = Boolean(
+    user &&
+      query.data?.owner?.id &&
+      user.id === query.data.owner.id
+  );
+
+  const onShare = useCallback(async () => {
+    if (!query.data) return;
+    const webUrl = `${SERVER_ORIGIN.replace(/\/$/, "")}/properties/${query.data.id}`;
+    try {
+      await Share.share({
+        message: `${query.data.title}\n${webUrl}`,
+        url: webUrl,
+        title: query.data.title,
+      });
+    } catch {
+      // User cancelled.
+    }
+  }, [query.data]);
+
+  const onMomentumEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const index = Math.round(event.nativeEvent.contentOffset.x / width);
+      setImageIndex(index);
+    },
+    []
   );
 
   if (!propertyId) {
@@ -85,32 +128,68 @@ export default function PropertyDetailScreen() {
 
   const property = query.data;
   const images = property.images?.length ? property.images : [];
-  const activeImage = images[imageIndex] || images[0];
 
   return (
-    <ScreenContainer style={styles.screen}>
-      <Stack.Screen options={{ title: property.title }} />
+    <ScreenContainer style={styles.screen} testID="property-detail-screen">
+      <Stack.Screen
+        options={{
+          title: property.title,
+          headerRight: () => (
+            <Pressable
+              onPress={() => void onShare()}
+              accessibilityRole="button"
+              accessibilityLabel="Share listing"
+              style={styles.shareHeader}
+              testID="property-share"
+            >
+              <Share2 size={20} color={colors.primaryDark} />
+            </Pressable>
+          ),
+        }}
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={query.isRefetching && !query.isLoading}
+            onRefresh={() => void query.refetch()}
+            tintColor={colors.primary}
+          />
+        }
       >
-        {activeImage && !isVideoUrl(activeImage) ? (
-          <Image source={{ uri: activeImage }} style={styles.hero} />
-        ) : activeImage && isVideoUrl(activeImage) ? (
-          <Pressable
-            style={[styles.hero, styles.heroVideo]}
-            onPress={() => void Linking.openURL(activeImage)}
-            accessibilityRole="button"
-            accessibilityLabel="Play listing video"
-          >
-            <Video size={36} color={colors.primaryForeground} />
-            <Text style={styles.heroVideoLabel}>Tap to play video</Text>
-          </Pressable>
+        {images.length > 0 ? (
+          <FlatList
+            ref={galleryRef}
+            data={images}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(uri, index) => `${uri}-${index}`}
+            onMomentumScrollEnd={onMomentumEnd}
+            renderItem={({ item: uri }) => (
+              <GallerySlide uri={uri} active={images[imageIndex] === uri} />
+            )}
+            style={styles.gallery}
+            getItemLayout={(_, index) => ({
+              length: width,
+              offset: width * index,
+              index,
+            })}
+          />
         ) : (
           <View style={[styles.hero, styles.heroFallback]}>
             <Text style={styles.fallbackText}>No photos</Text>
           </View>
         )}
+
+        {images.length > 1 ? (
+          <View style={styles.pagerRow}>
+            <Text style={styles.pagerText}>
+              {imageIndex + 1} / {images.length}
+            </Text>
+          </View>
+        ) : null}
 
         {images.length > 1 ? (
           <ScrollView
@@ -123,7 +202,10 @@ export default function PropertyDetailScreen() {
               return (
                 <Pressable
                   key={`${uri}-${index}`}
-                  onPress={() => setImageIndex(index)}
+                  onPress={() => {
+                    setImageIndex(index);
+                    galleryRef.current?.scrollToIndex({ index, animated: true });
+                  }}
                   accessibilityRole="button"
                   accessibilityLabel={video ? `Video ${index + 1}` : `Photo ${index + 1}`}
                   style={[
@@ -133,10 +215,15 @@ export default function PropertyDetailScreen() {
                 >
                   {video ? (
                     <View style={[styles.thumbImage, styles.thumbVideo]}>
-                      <Video size={16} color={colors.primaryForeground} />
+                      <VideoIcon size={16} color={colors.primaryForeground} />
                     </View>
                   ) : (
-                    <Image source={{ uri }} style={styles.thumbImage} />
+                    <Image
+                      source={{ uri }}
+                      style={styles.thumbImage}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                    />
                   )}
                 </Pressable>
               );
@@ -200,6 +287,25 @@ export default function PropertyDetailScreen() {
             }}
             style={styles.whatsapp}
           />
+          {!isOwner ? (
+            <SecondaryButton
+              label={user ? "Message about this listing" : "Sign in to message"}
+              onPress={() => {
+                if (!user) {
+                  router.push("/login");
+                  return;
+                }
+                router.push(
+                  `/inbox/new?propertyId=${encodeURIComponent(property.id)}&title=${encodeURIComponent(property.title)}`
+                );
+              }}
+              testID="property-message"
+            />
+          ) : null}
+          <SecondaryButton
+            label="Share listing"
+            onPress={() => void onShare()}
+          />
           {!contactPhone ? (
             <Text style={styles.contactHint}>
               Contact number is not available for this listing yet.
@@ -208,6 +314,54 @@ export default function PropertyDetailScreen() {
         </View>
       </ScrollView>
     </ScreenContainer>
+  );
+}
+
+function GallerySlide({ uri, active }: { uri: string; active: boolean }) {
+  if (isVideoUrl(uri) && isSafeExternalMediaUrl(uri)) {
+    return <InAppVideo uri={uri} active={active} />;
+  }
+  if (uri.startsWith("https://") || uri.startsWith("http://")) {
+    return (
+      <Image
+        source={{ uri }}
+        style={styles.hero}
+        contentFit="cover"
+        transition={200}
+        cachePolicy="memory-disk"
+      />
+    );
+  }
+  return (
+    <View style={[styles.hero, styles.heroFallback]}>
+      <Text style={styles.fallbackText}>Unavailable</Text>
+    </View>
+  );
+}
+
+function InAppVideo({ uri, active }: { uri: string; active: boolean }) {
+  const player = useVideoPlayer(uri, (instance) => {
+    instance.loop = true;
+  });
+
+  useEffect(() => {
+    if (active) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [active, player]);
+
+  return (
+    <View style={styles.hero}>
+      <VideoView
+        player={player}
+        style={styles.hero}
+        contentFit="cover"
+        nativeControls
+        fullscreenOptions={{ enable: true }}
+      />
+    </View>
   );
 }
 
@@ -228,29 +382,36 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: spacing["3xl"],
   },
+  gallery: {
+    width,
+    height: heroHeight,
+  },
   hero: {
     width,
-    height: Math.round(width * 0.72),
+    height: heroHeight,
     backgroundColor: colors.muted,
   },
   heroFallback: {
     alignItems: "center",
     justifyContent: "center",
   },
-  heroVideo: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    backgroundColor: colors.primaryDark,
-  },
-  heroVideoLabel: {
-    color: colors.primaryForeground,
-    fontFamily: typography.fonts.sansSemibold,
-    fontSize: typography.sizes.sm,
-  },
   fallbackText: {
     color: colors.mutedForeground,
     fontFamily: typography.fonts.sans,
+  },
+  pagerRow: {
+    position: "absolute",
+    top: heroHeight - 36,
+    right: spacing.lg,
+    backgroundColor: "rgba(15,61,40,0.72)",
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
+  pagerText: {
+    color: colors.primaryForeground,
+    fontFamily: typography.fonts.sansSemibold,
+    fontSize: typography.sizes.xs,
   },
   thumbs: {
     paddingHorizontal: spacing.lg,
@@ -366,6 +527,11 @@ const styles = StyleSheet.create({
     fontFamily: typography.fonts.sans,
     fontSize: typography.sizes.sm,
     marginTop: spacing.xs,
+  },
+  shareHeader: {
+    paddingHorizontal: spacing.sm,
+    minHeight: 44,
+    justifyContent: "center",
   },
   error: {
     color: colors.destructive,

@@ -6,13 +6,14 @@ import {
   toSafeVerificationDocuments,
 } from "@/lib/verification-documents";
 import { resolveStaffActor } from "@/lib/staff-auth";
-import { absoluteMediaUrls } from "@/lib/media-url";
+import { absoluteMediaUrls, isAllowedMediaUrl } from "@/lib/media-url";
 import {
   AuthError,
   authErrorResponse,
   optionalAuth,
   requireAuth,
 } from "@/lib/require-auth";
+import { propertyOwnerUpdateSchema } from "@/schemas/property";
 
 // GET a single property
 export async function GET(
@@ -247,62 +248,136 @@ export async function PATCH(
       );
     }
 
-    const formData = await req.formData();
+    const contentType = req.headers.get("content-type") || "";
     const updateData: Record<string, unknown> = {};
     const now = new Date();
+    let ownerMaterialEdit = false;
 
-    // Handle status updates (only admin can change status)
-    const newStatus = formData.get("status") as string;
-    if (newStatus && isAdmin) {
-      updateData.status = newStatus;
-
-      const statusChange = {
-        from: property.status,
-        to: newStatus,
-        changedAt: now,
-        changedBy: actor.userId,
-      };
-
-      updateData.statusHistory = [
-        ...(property.statusHistory || []),
-        statusChange,
-      ];
-
-      if (newStatus === "VERIFIED") {
-        updateData.verifiedAt = now;
-        updateData.verifierId = new ObjectId(actor.userId);
+    if (contentType.includes("application/json")) {
+      const body = await req.json();
+      const parsed = propertyOwnerUpdateSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json(
+          {
+            error: parsed.error.issues[0]?.message || "Invalid update payload",
+            details: parsed.error.issues,
+          },
+          { status: 400 }
+        );
       }
 
-      const rejectionReason = formData.get("rejectionReason") as string;
-      if (newStatus === "REJECTED" && rejectionReason) {
-        updateData.rejectionReason = rejectionReason;
+      if (!isOwner && !isAdmin) {
+        return NextResponse.json(
+          { error: "You don't have permission to update this property" },
+          { status: 403 }
+        );
+      }
+
+      const data = parsed.data;
+      if (data.title !== undefined) updateData.title = data.title;
+      if (data.description !== undefined) updateData.description = data.description;
+      if (data.price !== undefined) updateData.price = data.price;
+      if (data.type !== undefined) updateData.type = data.type;
+      if (data.listingType !== undefined) updateData.listingType = data.listingType;
+      if (data.bedrooms !== undefined) updateData.bedrooms = data.bedrooms;
+      if (data.bathrooms !== undefined) updateData.bathrooms = data.bathrooms;
+      if (data.area !== undefined) updateData.area = data.area;
+      if (data.address !== undefined) updateData.address = data.address;
+      if (data.cityId !== undefined) {
+        if (!ObjectId.isValid(data.cityId)) {
+          return NextResponse.json({ error: "Invalid cityId" }, { status: 400 });
+        }
+        updateData.cityId = new ObjectId(data.cityId);
+      }
+      if (data.imageUrls !== undefined) {
+        if (!data.imageUrls.every(isAllowedMediaUrl)) {
+          return NextResponse.json(
+            { error: "One or more image URLs are not allowed" },
+            { status: 400 }
+          );
+        }
+        updateData.images = data.imageUrls;
+      }
+
+      ownerMaterialEdit = Object.keys(updateData).length > 0;
+    } else {
+      const formData = await req.formData();
+
+      // Handle status updates (only admin can change status)
+      const newStatus = formData.get("status") as string;
+      if (newStatus && isAdmin) {
+        updateData.status = newStatus;
+
+        const statusChange = {
+          from: property.status,
+          to: newStatus,
+          changedAt: now,
+          changedBy: actor.userId,
+        };
+
+        updateData.statusHistory = [
+          ...(property.statusHistory || []),
+          statusChange,
+        ];
+
+        if (newStatus === "VERIFIED") {
+          updateData.verifiedAt = now;
+          updateData.verifierId = new ObjectId(actor.userId);
+        }
+
+        const rejectionReason = formData.get("rejectionReason") as string;
+        if (newStatus === "REJECTED" && rejectionReason) {
+          updateData.rejectionReason = rejectionReason;
+        }
+      }
+
+      // Owners can update basic property info
+      if (isOwner) {
+        const fields = [
+          "title",
+          "description",
+          "price",
+          "bedrooms",
+          "bathrooms",
+          "area",
+          "address",
+        ];
+
+        fields.forEach((field) => {
+          const value = formData.get(field);
+          if (value !== null && value !== undefined) {
+            if (["price", "area"].includes(field)) {
+              updateData[field] = Number(value);
+            } else if (["bedrooms", "bathrooms"].includes(field)) {
+              updateData[field] = value === "" ? null : Number(value);
+            } else {
+              updateData[field] = value;
+            }
+          }
+        });
+        ownerMaterialEdit = fields.some((field) => formData.get(field) != null);
       }
     }
 
-    // Owners can update basic property info
-    if (isOwner) {
-      const fields = [
-        "title",
-        "description",
-        "price",
-        "bedrooms",
-        "bathrooms",
-        "area",
-        "address",
+    // Material owner edits of live listings go back to review.
+    if (
+      isOwner &&
+      ownerMaterialEdit &&
+      ["VERIFIED", "ACTIVE"].includes(String(property.status))
+    ) {
+      updateData.status = "PENDING";
+      updateData.verifiedAt = null;
+      updateData.rejectionReason = null;
+      updateData.statusHistory = [
+        ...(property.statusHistory || []),
+        {
+          from: property.status,
+          to: "PENDING",
+          changedAt: now,
+          changedBy: actor.userId,
+          note: "Owner edited listing — re-verification required",
+        },
       ];
-
-      fields.forEach((field) => {
-        const value = formData.get(field);
-        if (value !== null && value !== undefined) {
-          if (["price", "area"].includes(field)) {
-            updateData[field] = Number(value);
-          } else if (["bedrooms", "bathrooms"].includes(field)) {
-            updateData[field] = value === "" ? null : Number(value);
-          } else {
-            updateData[field] = value;
-          }
-        }
-      });
     }
 
     if (Object.keys(updateData).length > 0) {
@@ -323,7 +398,7 @@ export async function PATCH(
       return NextResponse.json({
         message: "Property updated successfully",
         id,
-        ...updateData,
+        status: updateData.status ?? property.status,
       });
     }
 

@@ -6,6 +6,11 @@ import {
   createMobileSession,
   toPublicUser,
 } from "@/lib/mobile-auth";
+import {
+  enforceRateLimits,
+  getClientIp,
+  rateLimitResponse,
+} from "@/lib/rate-limit";
 
 const loginSchema = z.object({
   email: z
@@ -46,6 +51,19 @@ export async function POST(req: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    const ip = getClientIp(req);
+    const limited = await enforceRateLimits([
+      { key: `mobile-login:ip:${ip}`, limit: 20, windowSec: 15 * 60 },
+      {
+        key: `mobile-login:email:${parsed.data.email}`,
+        limit: 10,
+        windowSec: 15 * 60,
+      },
+    ]);
+    if (limited) {
+      return rateLimitResponse(limited);
     }
 
     const { user } = await authenticateMobilePassword({

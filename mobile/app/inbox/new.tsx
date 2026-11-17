@@ -1,16 +1,35 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
-import { router } from "expo-router";
+import { Stack, router, useLocalSearchParams } from "expo-router";
 import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
 import { ScreenContainer } from "@/src/components/ui/ScreenContainer";
 import { getApiErrorMessage } from "@/src/services/api/client";
-import { startSupportConversation } from "@/src/services/api/messaging";
+import {
+  startPropertyConversation,
+  startSupportConversation,
+} from "@/src/services/api/messaging";
 import { useAuthStore } from "@/src/store/authStore";
 import { colors, radii, spacing, typography } from "@/src/theme";
 
 export default function NewSupportMessageScreen() {
   const user = useAuthStore((s) => s.user);
-  const [body, setBody] = useState("");
+  const params = useLocalSearchParams<{
+    propertyId?: string;
+    title?: string;
+  }>();
+  const propertyId = Array.isArray(params.propertyId)
+    ? params.propertyId[0]
+    : params.propertyId;
+  const listingTitle = Array.isArray(params.title)
+    ? params.title[0]
+    : params.title;
+
+  const defaultBody = useMemo(() => {
+    if (!listingTitle) return "";
+    return `Hi, I'm interested in "${listingTitle}" on Manzil.`;
+  }, [listingTitle]);
+
+  const [body, setBody] = useState(defaultBody);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +50,12 @@ export default function NewSupportMessageScreen() {
     }
     setLoading(true);
     try {
-      const result = await startSupportConversation(body.trim());
+      const result = propertyId
+        ? await startPropertyConversation({
+            propertyId,
+            body: body.trim(),
+          })
+        : await startSupportConversation(body.trim());
       router.replace(`/inbox/${result.conversation.id}`);
     } catch (err) {
       setError(getApiErrorMessage(err, "Could not start conversation"));
@@ -42,9 +66,20 @@ export default function NewSupportMessageScreen() {
 
   return (
     <ScreenContainer scroll>
-      <Text style={styles.title}>Message support</Text>
+      <Stack.Screen
+        options={{
+          title: propertyId ? "Message about listing" : "Message support",
+        }}
+      />
+      <Text style={styles.title}>
+        {propertyId ? "Message about this listing" : "Message support"}
+      </Text>
       <Text style={styles.subtitle}>
-        Ask about a listing, verification, or your account.
+        {propertyId
+          ? listingTitle
+            ? `Ask Manzil about “${listingTitle}”.`
+            : "Ask Manzil about this property."
+          : "Ask about a listing, verification, or your account."}
       </Text>
       <TextInput
         value={body}
@@ -54,9 +89,15 @@ export default function NewSupportMessageScreen() {
         placeholder="How can we help?"
         placeholderTextColor={colors.mutedForeground}
         accessibilityLabel="Support message"
+        testID="inbox-new-body"
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <PrimaryButton label="Send" loading={loading} onPress={onSubmit} />
+      <PrimaryButton
+        label="Send"
+        loading={loading}
+        onPress={onSubmit}
+        testID="inbox-new-send"
+      />
     </ScreenContainer>
   );
 }

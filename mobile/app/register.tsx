@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -9,6 +10,8 @@ import {
   View,
 } from "react-native";
 import { Redirect, router } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import { BrandMark } from "@/src/components/brand/BrandMark";
 import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
 import { ScreenContainer } from "@/src/components/ui/ScreenContainer";
 import {
@@ -17,8 +20,17 @@ import {
   verifySignupOtp,
 } from "@/src/services/auth/authApi";
 import { getApiErrorMessage } from "@/src/services/api/client";
+import { PRIVACY_URL, TERMS_URL } from "@/src/config/env";
 import { useAuthStore } from "@/src/store/authStore";
 import { colors, radii, spacing, typography } from "@/src/theme";
+
+async function openLegalUrl(url: string): Promise<void> {
+  try {
+    await WebBrowser.openBrowserAsync(url);
+  } catch {
+    await Linking.openURL(url);
+  }
+}
 
 type Step = "details" | "otp" | "password";
 
@@ -34,6 +46,7 @@ export default function RegisterScreen() {
   const [signupToken, setSignupToken] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,6 +91,10 @@ export default function RegisterScreen() {
 
   async function onCreateAccount() {
     setError(null);
+    if (!acceptedTerms) {
+      setError("Please accept the Terms of Service and Privacy Policy");
+      return;
+    }
     if (
       password.length < 8 ||
       !/[a-z]/.test(password) ||
@@ -112,12 +129,14 @@ export default function RegisterScreen() {
   }
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer scroll atmosphere="auth">
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.wrap}
       >
-        <Text style={styles.brand}>Manzil</Text>
+        <View style={styles.brandBlock}>
+          <BrandMark size="md" />
+        </View>
         <Text style={styles.title}>Create account</Text>
         <Text style={styles.subtitle}>
           {step === "details"
@@ -222,9 +241,41 @@ export default function RegisterScreen() {
                 accessibilityLabel="Confirm password"
               />
             </View>
+            <Pressable
+              onPress={() => setAcceptedTerms((v) => !v)}
+              style={styles.consentRow}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: acceptedTerms }}
+              testID="register-consent"
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  acceptedTerms ? styles.checkboxChecked : null,
+                ]}
+              />
+              <Text style={styles.consentText}>
+                I agree to the{" "}
+                <Text
+                  style={styles.consentLink}
+                  onPress={() => void openLegalUrl(TERMS_URL)}
+                >
+                  Terms of Service
+                </Text>{" "}
+                and{" "}
+                <Text
+                  style={styles.consentLink}
+                  onPress={() => void openLegalUrl(PRIVACY_URL)}
+                >
+                  Privacy Policy
+                </Text>
+                .
+              </Text>
+            </Pressable>
             <PrimaryButton
               label="Create account"
               loading={loading}
+              disabled={!acceptedTerms}
               onPress={onCreateAccount}
             />
           </>
@@ -252,10 +303,9 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingTop: spacing.md,
   },
-  brand: {
-    color: colors.primary,
-    fontFamily: typography.fonts.serifBold,
-    fontSize: typography.sizes["3xl"],
+  brandBlock: {
+    alignItems: "center",
+    marginBottom: spacing.sm,
   },
   title: {
     color: colors.foreground,
@@ -304,6 +354,36 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
   },
   switchLink: {
+    color: colors.primary,
+    fontFamily: typography.fonts.sansSemibold,
+  },
+  consentRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  consentText: {
+    flex: 1,
+    color: colors.mutedForeground,
+    fontFamily: typography.fonts.sans,
+    fontSize: typography.sizes.sm,
+    lineHeight: 20,
+  },
+  consentLink: {
     color: colors.primary,
     fontFamily: typography.fonts.sansSemibold,
   },

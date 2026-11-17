@@ -27,7 +27,7 @@ export default function InboxScreen() {
 
   useForegroundPolling({
     enabled: Boolean(user),
-    intervalMs: 4000,
+    intervalMs: 6000,
     onTick: async () => {
       await queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },

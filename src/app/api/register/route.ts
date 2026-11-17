@@ -4,6 +4,11 @@ import { registerSchema } from "@/schemas/auth";
 import prisma from "@/lib/prismadb";
 import { normalizeEmail, verifySignupToken } from "@/lib/otp";
 import { sendBuyerWelcomeEmail } from "@/lib/email";
+import {
+  enforceRateLimits,
+  getClientIp,
+  rateLimitResponse,
+} from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
@@ -15,6 +20,14 @@ export async function POST(request: Request) {
         { error: "Invalid input data", issues: validation.error.issues },
         { status: 400 }
       );
+    }
+
+    const ip = getClientIp(request);
+    const limited = await enforceRateLimits([
+      { key: `register:ip:${ip}`, limit: 10, windowSec: 60 * 60 },
+    ]);
+    if (limited) {
+      return rateLimitResponse(limited, "Too many registration attempts.");
     }
 
     const { name, password, signupToken } = validation.data;

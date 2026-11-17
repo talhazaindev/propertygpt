@@ -215,6 +215,17 @@ export async function rotateMobileSession(refreshToken: string): Promise<{
   }
 
   if (existing.revokedAt) {
+    // Short grace window: a lost rotate response can present the just-consumed
+    // token again. Treat that as a race (retryable) instead of theft revoke.
+    const revokedAgeMs = Date.now() - existing.revokedAt.getTime();
+    const GRACE_MS = 30_000;
+    if (revokedAgeMs <= GRACE_MS) {
+      throw new MobileAuthError(
+        "Refresh already rotated — retry shortly",
+        409,
+        "REFRESH_RACE"
+      );
+    }
     await prisma.mobileSession.updateMany({
       where: { familyId: existing.familyId, revokedAt: null },
       data: { revokedAt: new Date() },
@@ -240,12 +251,27 @@ export async function rotateMobileSession(refreshToken: string): Promise<{
   });
 
   if (consume.count !== 1) {
-    throw new MobileAuthError("Refresh race lost", 401, "REFRESH_RACE");
+    throw new MobileAuthError("Refresh race lost", 409, "REFRESH_RACE");
   }
 
   const user = await loadPublicUser(existing.userId);
   if (!user) {
     throw new MobileAuthError("User not found", 401, "USER_NOT_FOUND");
+  }
+
+  if (user.role === "AGENT") {
+    const status = user.agentProfile?.status;
+    if (!status || status === "PENDING" || status === "REJECTED" || status === "SUSPENDED") {
+      await prisma.mobileSession.updateMany({
+        where: { familyId: existing.familyId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw new MobileAuthError(
+        "Agent account is not active",
+        403,
+        "AGENT_INACTIVE"
+      );
+    }
   }
 
   const nextRefresh = generateRefreshToken();

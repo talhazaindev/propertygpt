@@ -3,16 +3,20 @@ import { AppState, type AppStateStatus } from "react-native";
 
 type Options = {
   enabled: boolean;
+  /** Base interval while polls succeed. */
   intervalMs?: number;
+  /** Cap for exponential backoff after errors. */
+  maxIntervalMs?: number;
   onTick: () => Promise<void> | void;
 };
 
 /**
- * Foreground-only polling for inbox (no Socket.IO on mobile MVP).
+ * Foreground-only polling with exponential backoff on failures.
  */
 export function useForegroundPolling({
   enabled,
-  intervalMs = 4000,
+  intervalMs = 6000,
+  maxIntervalMs = 60000,
   onTick,
 }: Options) {
   const tickRef = useRef(onTick);
@@ -24,7 +28,10 @@ export function useForegroundPolling({
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let inFlight = false;
-    let appState: AppStateStatus = AppState.currentState;
+    let appState: AppStateStatus =
+      (AppState.currentState as AppStateStatus | null) ?? "active";
+    let delay = intervalMs;
+    let failures = 0;
 
     const clearTimer = () => {
       if (timer) {
@@ -33,35 +40,43 @@ export function useForegroundPolling({
       }
     };
 
-    const schedule = () => {
+    const schedule = (nextDelay: number) => {
       if (cancelled) return;
       clearTimer();
       timer = setTimeout(() => {
         void run();
-      }, intervalMs);
+      }, nextDelay);
     };
 
     const run = async () => {
       if (cancelled || inFlight || appState !== "active") {
-        schedule();
+        schedule(delay);
         return;
       }
       inFlight = true;
       try {
         await tickRef.current();
+        failures = 0;
+        delay = intervalMs;
       } catch {
-        // Next tick retries.
+        failures += 1;
+        delay = Math.min(
+          maxIntervalMs,
+          intervalMs * Math.pow(2, Math.min(failures, 4))
+        );
       } finally {
         inFlight = false;
-        schedule();
+        schedule(delay);
       }
     };
 
-    schedule();
+    schedule(intervalMs);
 
     const sub = AppState.addEventListener("change", (next) => {
       appState = next;
       if (next === "active") {
+        delay = intervalMs;
+        failures = 0;
         clearTimer();
         void run();
       }
@@ -72,5 +87,5 @@ export function useForegroundPolling({
       clearTimer();
       sub.remove();
     };
-  }, [enabled, intervalMs]);
+  }, [enabled, intervalMs, maxIntervalMs]);
 }

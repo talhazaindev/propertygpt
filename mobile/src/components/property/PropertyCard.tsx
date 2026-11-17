@@ -1,5 +1,6 @@
 import { memo, useMemo } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
 import { Video } from "lucide-react-native";
 import { VerifiedBadge } from "@/src/components/ui/VerifiedBadge";
 import type { PropertyListItem } from "@/src/services/api/properties";
@@ -44,6 +45,9 @@ function PropertyCardComponent({ item, onPress }: PropertyCardProps) {
           <Image
             source={{ uri: cover }}
             style={styles.image}
+            contentFit="cover"
+            transition={200}
+            cachePolicy="memory-disk"
             accessibilityIgnoresInvertColors
           />
         ) : coverIsVideo ? (

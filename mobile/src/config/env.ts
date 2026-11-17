@@ -14,18 +14,30 @@ const extra = (Constants.expoConfig?.extra ?? {}) as AppExtra;
  * API origin for the existing Next.js backend.
  * Override via app.config extra or EXPO_PUBLIC_API_BASE_URL.
  */
-export const API_BASE_URL =
+const resolvedApiBase =
   process.env.EXPO_PUBLIC_API_BASE_URL ||
   extra.apiBaseUrl ||
   "https://propertygpt-six.vercel.app";
+
+export const APP_ENV =
+  process.env.EXPO_PUBLIC_APP_ENV || ("development" as string);
+
+/** Preview/production builds must talk HTTPS only (Bearer tokens). */
+if (
+  APP_ENV !== "development" &&
+  !resolvedApiBase.toLowerCase().startsWith("https://")
+) {
+  throw new Error(
+    `EXPO_PUBLIC_API_BASE_URL must be https when APP_ENV=${APP_ENV}`
+  );
+}
+
+export const API_BASE_URL = resolvedApiBase;
 
 export const SERVER_ORIGIN =
   process.env.EXPO_PUBLIC_SERVER_ORIGIN ||
   extra.serverOrigin ||
   API_BASE_URL;
-
-export const APP_ENV =
-  process.env.EXPO_PUBLIC_APP_ENV || ("development" as string);
 
 export const SENTRY_DSN =
   process.env.EXPO_PUBLIC_SENTRY_DSN || extra.sentryDsn || "";

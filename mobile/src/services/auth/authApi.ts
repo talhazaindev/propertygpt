@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import { apiClient, getApiErrorMessage } from "@/src/services/api/client";
+import { apiClient } from "@/src/services/api/client";
 import {
   clearTokens,
   getRefreshToken,
@@ -32,30 +32,78 @@ export async function loginWithPassword(input: {
   return data;
 }
 
-export async function sendSignupOtp(email: string): Promise<{ expiresInMinutes: number }> {
+export async function sendOtp(input: {
+  email: string;
+  purpose: "SIGNUP" | "PASSWORD_RESET";
+}): Promise<{ expiresInMinutes: number }> {
   const { data } = await apiClient.post<{
     message: string;
     expiresInMinutes: number;
   }>("/api/auth/otp/send", {
-    email: email.trim().toLowerCase(),
-    purpose: "SIGNUP",
+    email: input.email.trim().toLowerCase(),
+    purpose: input.purpose,
   });
-  return { expiresInMinutes: data.expiresInMinutes };
+  return { expiresInMinutes: data.expiresInMinutes ?? 10 };
 }
 
-export async function verifySignupOtp(input: {
+export async function sendSignupOtp(email: string): Promise<{ expiresInMinutes: number }> {
+  return sendOtp({ email, purpose: "SIGNUP" });
+}
+
+export async function sendResetOtp(email: string): Promise<{ expiresInMinutes: number }> {
+  return sendOtp({ email, purpose: "PASSWORD_RESET" });
+}
+
+export async function verifyOtp(input: {
   email: string;
   code: string;
+  purpose: "SIGNUP" | "PASSWORD_RESET";
 }): Promise<{ signupToken: string }> {
   const { data } = await apiClient.post<{
     message: string;
     signupToken: string;
   }>("/api/auth/otp/verify", {
     email: input.email.trim().toLowerCase(),
-    purpose: "SIGNUP",
+    purpose: input.purpose,
     code: input.code.trim(),
   });
   return { signupToken: data.signupToken };
+}
+
+export async function verifySignupOtp(input: {
+  email: string;
+  code: string;
+}): Promise<{ signupToken: string }> {
+  return verifyOtp({ ...input, purpose: "SIGNUP" });
+}
+
+export async function verifyResetOtp(input: {
+  email: string;
+  code: string;
+}): Promise<{ resetToken: string }> {
+  const result = await verifyOtp({ ...input, purpose: "PASSWORD_RESET" });
+  return { resetToken: result.signupToken };
+}
+
+export async function resetPassword(input: {
+  email: string;
+  resetToken: string;
+  password: string;
+  confirmPassword: string;
+}): Promise<void> {
+  await apiClient.post("/api/auth/reset-password", {
+    email: input.email.trim().toLowerCase(),
+    resetToken: input.resetToken,
+    password: input.password,
+    confirmPassword: input.confirmPassword,
+  });
+}
+
+export async function deleteAccount(password: string): Promise<void> {
+  await apiClient.delete("/api/me", {
+    data: { password, confirm: true },
+  });
+  await clearTokens();
 }
 
 export async function registerAccount(input: {
@@ -79,14 +127,38 @@ export async function fetchMe(): Promise<MobileUser> {
   return data;
 }
 
+export async function updateProfile(input: {
+  name?: string;
+  phoneNumber?: string;
+}): Promise<MobileUser> {
+  const { data } = await apiClient.patch<MobileUser>("/api/me", {
+    name: input.name?.trim(),
+    phoneNumber:
+      input.phoneNumber === undefined
+        ? undefined
+        : input.phoneNumber.trim() || "",
+  });
+  return data;
+}
+
 export async function logoutCurrentSession(): Promise<void> {
   const refreshToken = await getRefreshToken();
   try {
     await apiClient.post("/api/auth/mobile/logout", {
       refreshToken: refreshToken || undefined,
     });
-  } catch (error) {
-    console.warn("[auth] logout request failed:", getApiErrorMessage(error));
+  } catch {
+    // Best-effort — always clear local tokens.
+  } finally {
+    await clearTokens();
+  }
+}
+
+export async function logoutAllSessions(): Promise<void> {
+  try {
+    await apiClient.post("/api/auth/mobile/logout", { all: true });
+  } catch {
+    // Best-effort — always clear local tokens.
   } finally {
     await clearTokens();
   }

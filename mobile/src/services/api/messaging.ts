@@ -13,6 +13,13 @@ export type ConversationSummary = {
   createdAt: string;
 };
 
+export type MessageAttachment = {
+  url: string;
+  name: string;
+  type: string;
+  size?: number;
+};
+
 export type ChatMessage = {
   id: string;
   conversationId: string;
@@ -20,6 +27,7 @@ export type ChatMessage = {
   body: string;
   createdAt: string;
   readAt: string | null;
+  attachments?: MessageAttachment[];
 };
 
 export async function fetchConversations(): Promise<ConversationSummary[]> {
@@ -33,8 +41,16 @@ export async function fetchConversationThread(id: string): Promise<{
   conversation: ConversationSummary;
   messages: ChatMessage[];
 }> {
-  const { data } = await apiClient.get(`/api/messages/conversations/${id}`);
+  const { data } = await apiClient.get(
+    `/api/messages/conversations/${encodeURIComponent(id)}`
+  );
   return data;
+}
+
+export async function markConversationRead(id: string): Promise<void> {
+  await apiClient.patch(
+    `/api/messages/conversations/${encodeURIComponent(id)}/read`
+  );
 }
 
 export async function startSupportConversation(body: string): Promise<{
@@ -47,13 +63,31 @@ export async function startSupportConversation(body: string): Promise<{
   return data;
 }
 
+export async function startPropertyConversation(input: {
+  propertyId: string;
+  body: string;
+}): Promise<{ conversation: ConversationSummary }> {
+  const { data } = await apiClient.post("/api/messages/conversations", {
+    subjectType: "PROPERTY",
+    subjectId: input.propertyId,
+    body: input.body,
+  });
+  return data;
+}
+
 export async function sendConversationMessage(
   conversationId: string,
-  body: string
+  input: {
+    body: string;
+    attachments?: MessageAttachment[];
+  }
 ): Promise<{ message: ChatMessage }> {
   const { data } = await apiClient.post(
-    `/api/messages/conversations/${conversationId}/messages`,
-    { body }
+    `/api/messages/conversations/${encodeURIComponent(conversationId)}/messages`,
+    {
+      body: input.body,
+      attachments: input.attachments?.length ? input.attachments : undefined,
+    }
   );
   return data;
 }

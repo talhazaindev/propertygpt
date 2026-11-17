@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Image,
@@ -11,14 +11,19 @@ import {
   View,
 } from "react-native";
 import { openSettings } from "expo-linking";
-import { router } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, ImagePlus, Video } from "lucide-react-native";
 import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
 import { SecondaryButton } from "@/src/components/ui/SecondaryButton";
 import { ScreenContainer } from "@/src/components/ui/ScreenContainer";
+import { StateBlock } from "@/src/components/ui/StateBlock";
 import { apiClient, getApiErrorMessage } from "@/src/services/api/client";
-import { fetchCities } from "@/src/services/api/properties";
+import {
+  fetchCities,
+  fetchPropertyById,
+  updateProperty,
+} from "@/src/services/api/properties";
 import { captureAndUploadMedia } from "@/src/services/upload/captureMedia";
 import {
   detectMediaKind,
@@ -94,9 +99,19 @@ function permissionAlert(kind: "photo" | "video" | "library"): void {
 export default function CreateListingScreen() {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
+  const params = useLocalSearchParams<{ editId?: string }>();
+  const editIdRaw = params.editId;
+  const editId = Array.isArray(editIdRaw) ? editIdRaw[0] : editIdRaw;
+  const isEdit = Boolean(editId);
+
   const cities = useQuery({
     queryKey: ["cities"],
     queryFn: fetchCities,
+  });
+  const existing = useQuery({
+    queryKey: ["property", editId, "edit"],
+    queryFn: () => fetchPropertyById(editId as string),
+    enabled: Boolean(editId),
   });
 
   const [title, setTitle] = useState("");
@@ -115,6 +130,36 @@ export default function CreateListingScreen() {
   const [loading, setLoading] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [prefilled, setPrefilled] = useState(false);
+
+  useEffect(() => {
+    if (!existing.data || prefilled) return;
+    const property = existing.data;
+    setTitle(property.title || "");
+    setDescription(property.description || "");
+    setPrice(String(property.price ?? ""));
+    setArea(String(property.area ?? ""));
+    setAddress(property.address || "");
+    setBedrooms(property.bedrooms != null ? String(property.bedrooms) : "");
+    setBathrooms(property.bathrooms != null ? String(property.bathrooms) : "");
+    if (
+      PROPERTY_TYPES.includes(property.type as (typeof PROPERTY_TYPES)[number])
+    ) {
+      setType(property.type as (typeof PROPERTY_TYPES)[number]);
+    }
+    if (property.listingType === "RENTAL" || property.listingType === "SALE") {
+      setListingType(property.listingType);
+    }
+    if (property.city?.id) setCityId(property.city.id);
+    setMedia(
+      (property.images || []).map((url, index) => ({
+        url,
+        name: `media-${index}`,
+        kind: detectMediaKind({ url }),
+      }))
+    );
+    setPrefilled(true);
+  }, [existing.data, prefilled]);
 
   const { openDocumentPicker, isUploading: uploadingDocs } = useDocumentUploader(
     "verificationDocuments",
@@ -202,6 +247,27 @@ export default function CreateListingScreen() {
     );
   }
 
+  if (isEdit && existing.isLoading) {
+    return (
+      <ScreenContainer>
+        <Stack.Screen options={{ title: "Edit listing" }} />
+        <StateBlock loading />
+      </ScreenContainer>
+    );
+  }
+
+  if (isEdit && (existing.isError || !existing.data)) {
+    return (
+      <ScreenContainer>
+        <Stack.Screen options={{ title: "Edit listing" }} />
+        <StateBlock
+          error={getApiErrorMessage(existing.error, "Could not load listing")}
+          onRetry={() => void existing.refetch()}
+        />
+      </ScreenContainer>
+    );
+  }
+
   async function onSubmit() {
     setError(null);
     if (!title.trim() || !description.trim() || !address.trim()) {
@@ -226,46 +292,75 @@ export default function CreateListingScreen() {
       setError("Add at least one property photo");
       return;
     }
-    if (docs.length === 0) {
+    if (!isEdit && docs.length === 0) {
       setError("Add at least one verification document");
       return;
     }
 
+    const imageUrls = [
+      ...media.filter((item) => item.kind === "image"),
+      ...media.filter((item) => item.kind === "video"),
+    ]
+      .map((item) => item.url)
+      .filter(Boolean);
+
     setLoading(true);
     try {
-      await apiClient.post("/api/properties", {
-        title: title.trim(),
-        description: description.trim(),
-        price: priceNum,
-        type,
-        listingType,
-        bedrooms: bedrooms ? Number(bedrooms) : undefined,
-        bathrooms: bathrooms ? Number(bathrooms) : undefined,
-        area: areaNum,
-        address: address.trim(),
-        cityId,
-        // Photos first, then videos — detail UI can detect video by extension.
-        imageUrls: [
-          ...media.filter((item) => item.kind === "image"),
-          ...media.filter((item) => item.kind === "video"),
-        ]
-          .map((item) => item.url)
-          .filter(Boolean),
-        verificationDocuments: docs.map((doc) => ({
-          type: doc.type,
-          url: doc.url,
-          fileName: doc.name,
-          ...(doc.key ? { fileKey: doc.key } : {}),
-        })),
-      });
-      await queryClient.invalidateQueries({ queryKey: ["properties", "mine"] });
-      Alert.alert(
-        "Submitted",
-        "Your listing was submitted for Manzil verification.",
-        [{ text: "OK", onPress: () => router.replace("/(tabs)/sell") }]
-      );
+      if (isEdit && editId) {
+        await updateProperty(editId, {
+          title: title.trim(),
+          description: description.trim(),
+          price: priceNum,
+          type,
+          listingType,
+          bedrooms: bedrooms ? Number(bedrooms) : null,
+          bathrooms: bathrooms ? Number(bathrooms) : null,
+          area: areaNum,
+          address: address.trim(),
+          cityId,
+          imageUrls,
+        });
+        await queryClient.invalidateQueries({ queryKey: ["properties", "mine"] });
+        await queryClient.invalidateQueries({ queryKey: ["property", editId] });
+        Alert.alert(
+          "Saved",
+          "Your listing was updated. Verified listings return to review after edits.",
+          [{ text: "OK", onPress: () => router.replace("/(tabs)/sell") }]
+        );
+      } else {
+        await apiClient.post("/api/properties", {
+          title: title.trim(),
+          description: description.trim(),
+          price: priceNum,
+          type,
+          listingType,
+          bedrooms: bedrooms ? Number(bedrooms) : undefined,
+          bathrooms: bathrooms ? Number(bathrooms) : undefined,
+          area: areaNum,
+          address: address.trim(),
+          cityId,
+          imageUrls,
+          verificationDocuments: docs.map((doc) => ({
+            type: doc.type,
+            url: doc.url,
+            fileName: doc.name,
+            ...(doc.key ? { fileKey: doc.key } : {}),
+          })),
+        });
+        await queryClient.invalidateQueries({ queryKey: ["properties", "mine"] });
+        Alert.alert(
+          "Submitted",
+          "Your listing was submitted for Manzil verification.",
+          [{ text: "OK", onPress: () => router.replace("/(tabs)/sell") }]
+        );
+      }
     } catch (err) {
-      setError(getApiErrorMessage(err, "Could not submit listing"));
+      setError(
+        getApiErrorMessage(
+          err,
+          isEdit ? "Could not update listing" : "Could not submit listing"
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -273,14 +368,20 @@ export default function CreateListingScreen() {
 
   return (
     <ScreenContainer scroll atmosphere="hero">
+      <Stack.Screen
+        options={{ title: isEdit ? "Edit listing" : "List a property" }}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.wrap}
       >
-        <Text style={styles.title}>List a property</Text>
+        <Text style={styles.title}>
+          {isEdit ? "Edit listing" : "List a property"}
+        </Text>
         <Text style={styles.subtitle}>
-          Capture photos or short videos on site, then attach ownership documents
-          for verification.
+          {isEdit
+            ? "Update details and media. Verified or active listings return to review after you save."
+            : "Capture photos or short videos on site, then attach ownership documents for verification."}
         </Text>
 
         <Field label="Title" value={title} onChangeText={setTitle} />
@@ -409,34 +510,42 @@ export default function CreateListingScreen() {
           <Text style={styles.hint}>Long-press a thumbnail to remove it.</Text>
         ) : null}
 
-        <Text style={styles.label}>Verification documents</Text>
-        <View style={styles.rowWrap}>
-          {DOC_TYPES.map((value) => (
-            <Chip
-              key={value}
-              label={value}
-              active={pendingDocType === value}
-              onPress={() => setPendingDocType(value)}
+        {!isEdit ? (
+          <>
+            <Text style={styles.label}>Verification documents</Text>
+            <View style={styles.rowWrap}>
+              {DOC_TYPES.map((value) => (
+                <Chip
+                  key={value}
+                  label={value}
+                  active={pendingDocType === value}
+                  onPress={() => setPendingDocType(value)}
+                />
+              ))}
+            </View>
+            <PrimaryButton
+              label={uploadingDocs ? "Uploading…" : `Upload ${pendingDocType}`}
+              disabled={busy}
+              onPress={() => {
+                void openDocumentPicker({});
+              }}
             />
-          ))}
-        </View>
-        <PrimaryButton
-          label={uploadingDocs ? "Uploading…" : `Upload ${pendingDocType}`}
-          disabled={busy}
-          onPress={() => {
-            void openDocumentPicker({});
-          }}
-        />
-        {docs.map((doc, index) => (
-          <Text key={`${doc.name}-${index}`} style={styles.docLine}>
-            {doc.type}: {doc.name}
+            {docs.map((doc, index) => (
+              <Text key={`${doc.name}-${index}`} style={styles.docLine}>
+                {doc.type}: {doc.name}
+              </Text>
+            ))}
+          </>
+        ) : (
+          <Text style={styles.hint}>
+            Existing verification documents stay on file. Contact support to replace them.
           </Text>
-        ))}
+        )}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <PrimaryButton
-          label="Submit for verification"
+          label={isEdit ? "Save changes" : "Submit for verification"}
           loading={busy}
           onPress={onSubmit}
         />

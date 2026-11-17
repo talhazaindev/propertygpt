@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "pk.alwahabco.manzil"
+      "bundleIdentifier": "pk.alwahabco.manzil",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +27,26 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "package": "pk.alwahabco.manzil",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "propertygpt-six.vercel.app",
+              "pathPrefix": "/properties"
+            },
+            {
+              "scheme": "manzil",
+              "host": "*",
+              "pathPrefix": "/property"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -54,7 +76,8 @@
         }
       ],
       "expo-image",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true
@@ -63,8 +86,8 @@
       "apiBaseUrl": "https://propertygpt-six.vercel.app",
       "serverOrigin": "https://propertygpt-six.vercel.app",
       "sentryDsn": "",
-      "privacyUrl": "",
-      "termsUrl": "",
+      "privacyUrl": "https://propertygpt-six.vercel.app/privacy",
+      "termsUrl": "https://propertygpt-six.vercel.app/terms",
       "eas": {
         "projectId": ""
       }

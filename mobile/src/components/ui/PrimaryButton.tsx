@@ -5,7 +5,7 @@ import {
   Text,
   type PressableProps,
 } from "react-native";
-import { colors, layout, radii, spacing, typography } from "@/src/theme";
+import { colors, elevation, layout, radii, spacing, typography } from "@/src/theme";
 
 type PrimaryButtonProps = PressableProps & {
   label: string;
@@ -47,14 +47,15 @@ export function PrimaryButton({
 const styles = StyleSheet.create({
   button: {
     minHeight: layout.tapTarget,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.xl,
+    ...elevation.card,
   },
   pressed: {
-    opacity: 0.9,
+    backgroundColor: colors.primaryDark,
   },
   disabled: {
     opacity: 0.5,
@@ -63,5 +64,6 @@ const styles = StyleSheet.create({
     color: colors.primaryForeground,
     fontFamily: typography.fonts.sansSemibold,
     fontSize: typography.sizes.sm,
+    letterSpacing: 0.2,
   },
 });

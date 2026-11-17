@@ -1,5 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { API_BASE_URL } from "@/src/config/env";
+import { API_BASE_URL, APP_ENV } from "@/src/config/env";
 import { captureApiError } from "@/src/monitoring/sentry";
 import {
   clearTokens,
@@ -18,6 +18,27 @@ export const apiClient = axios.create({
 });
 
 let refreshPromise: Promise<string | null> | null = null;
+
+const AUTH_CLEAR_CODES = new Set([
+  "INVALID_REFRESH",
+  "REFRESH_REUSE",
+  "REFRESH_EXPIRED",
+  "USER_NOT_FOUND",
+  "AGENT_INACTIVE",
+]);
+
+function normalizeApiPath(url?: string): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url, API_BASE_URL);
+    return parsed.pathname.replace(
+      /\/[a-f0-9]{24}(?=\/|$)/gi,
+      "/:id"
+    );
+  } catch {
+    return url.split("?")[0];
+  }
+}
 
 async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = await getRefreshToken();
@@ -42,8 +63,23 @@ async function refreshAccessToken(): Promise<string | null> {
       refreshToken: data.refreshToken,
     });
     return data.accessToken as string;
-  } catch {
-    await clearTokens();
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const code = (error.response?.data as { code?: string } | undefined)?.code;
+
+      if (
+        status === 401 ||
+        status === 403 ||
+        (typeof code === "string" && AUTH_CLEAR_CODES.has(code))
+      ) {
+        await clearTokens();
+        return null;
+      }
+
+      return null;
+    }
+
     return null;
   }
 }
@@ -63,14 +99,20 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
-    if (error.response?.status !== 401 || !original || original._retry) {
-      if (error.response?.status && error.response.status >= 500) {
-        captureApiError(error, {
-          url: original?.url,
-          method: original?.method,
-          status: error.response.status,
-        });
-      }
+    const status = error.response?.status;
+    const shouldCapture =
+      (typeof status === "number" && status >= 500) || !error.response;
+
+    if (shouldCapture) {
+      captureApiError(error, {
+        path: normalizeApiPath(original?.url),
+        method: original?.method,
+        status: status ?? null,
+        code: error.code || null,
+      });
+    }
+
+    if (status !== 401 || !original || original._retry) {
       return Promise.reject(error);
     }
 
@@ -97,6 +139,8 @@ export type ApiErrorBody = {
   message?: string;
   code?: string;
   details?: Array<{ message?: string; path?: Array<string | number> }>;
+  issues?: Array<{ message?: string; path?: Array<string | number> }>;
+  retryAfterSeconds?: number;
 };
 
 export function getApiErrorMessage(error: unknown, fallback = "Something went wrong"): string {
@@ -104,29 +148,58 @@ export function getApiErrorMessage(error: unknown, fallback = "Something went wr
     const data = error.response?.data as ApiErrorBody | string | undefined;
 
     if (typeof data === "string" && data.trim()) {
-      return data.replace(/<[^>]+>/g, " ").trim().slice(0, 180);
+      const stripped = data.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      // Never surface raw HTML or long stack dumps to users.
+      if (stripped.length > 180 || /<!doctype|<\/html/i.test(data)) {
+        return fallback;
+      }
+      return stripped.slice(0, 180);
     }
 
     if (data && typeof data === "object") {
-      if (data.error || data.message) {
-        return data.error || data.message || fallback;
+      if (data.code === "RATE_LIMITED") {
+        const wait = data.retryAfterSeconds;
+        return wait
+          ? `Too many attempts. Try again in ${wait}s.`
+          : "Too many attempts. Try again later.";
       }
-      const detail = data.details?.[0]?.message;
+      const detail =
+        data.details?.[0]?.message || data.issues?.[0]?.message;
       if (detail) return detail;
+      if (typeof data.error === "string" && data.error.trim()) {
+        return data.error;
+      }
+      if (typeof data.message === "string" && data.message.trim()) {
+        return data.message;
+      }
     }
 
     if (!error.response) {
-      return `Cannot reach API at ${API_BASE_URL}. Is the backend running?`;
+      if (error.code === "ECONNABORTED") {
+        return "Request timed out. Try again.";
+      }
+      return "Cannot reach the server. Check your connection and try again.";
     }
 
     if (error.response.status === 401) {
-      return "Invalid email or password";
+      return "Please sign in again.";
     }
-    if (error.response.status === 400) {
-      return "Invalid login details. Check your email and try again.";
+    if (error.response.status === 403) {
+      return "You do not have permission to do that.";
+    }
+    if (error.response.status === 404) {
+      return "Not found.";
+    }
+    if (error.response.status === 429) {
+      return "Too many attempts. Try again later.";
+    }
+    if (error.response.status >= 500) {
+      return "Server error. Please try again.";
     }
 
-    return error.message || fallback;
+    return APP_ENV === "development"
+      ? error.message || fallback
+      : fallback;
   }
   if (error instanceof Error) {
     return error.message;

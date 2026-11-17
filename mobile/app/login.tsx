@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Redirect, router } from "expo-router";
+import { BrandMark } from "@/src/components/brand/BrandMark";
 import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
 import { ScreenContainer } from "@/src/components/ui/ScreenContainer";
 import { API_BASE_URL, APP_ENV } from "@/src/config/env";
@@ -41,70 +42,91 @@ export default function LoginScreen() {
   }
 
   return (
-    <ScreenContainer scroll testID="login-screen">
+    <ScreenContainer scroll atmosphere="auth" testID="login-screen">
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.wrap}
       >
-        <Text style={styles.brand}>Manzil</Text>
+        <View style={styles.brandBlock}>
+          <BrandMark size="lg" />
+          <View style={styles.goldRule} />
+        </View>
+
         <Text style={styles.title}>Welcome back</Text>
         <Text style={styles.subtitle}>
           Sign in to manage your account, listings, and messages.
         </Text>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            placeholder="you@example.com"
-            placeholderTextColor={colors.mutedForeground}
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            textContentType="emailAddress"
-            autoComplete="email"
-            accessibilityLabel="Email"
-            testID="login-email"
+        <View style={styles.card}>
+          <View style={styles.field}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              placeholder="you@example.com"
+              placeholderTextColor={colors.mutedForeground}
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              textContentType="emailAddress"
+              autoComplete="email"
+              accessibilityLabel="Email"
+              testID="login-email"
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Password</Text>
+            <View style={styles.passwordRow}>
+              <TextInput
+                secureTextEntry={!showPassword}
+                placeholder="Enter your password"
+                placeholderTextColor={colors.mutedForeground}
+                style={[styles.input, styles.passwordInput]}
+                value={password}
+                onChangeText={setPassword}
+                textContentType="password"
+                autoComplete="password"
+                accessibilityLabel="Password"
+                testID="login-password"
+              />
+              <Pressable
+                onPress={() => setShowPassword((v) => !v)}
+                style={styles.showToggle}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+              >
+                <Text style={styles.showToggleText}>
+                  {showPassword ? "Hide" : "Show"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {error ? (
+            <Text style={styles.error} accessibilityRole="alert">
+              {error}
+            </Text>
+          ) : null}
+
+          <Pressable
+            onPress={() => router.push("/forgot-password")}
+            accessibilityRole="link"
+            style={styles.forgotRow}
+            testID="login-forgot"
+          >
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </Pressable>
+
+          <PrimaryButton
+            label="Sign in"
+            loading={loading}
+            onPress={onSubmit}
+            disabled={!email.trim() || !password}
+            testID="login-submit"
           />
         </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Password</Text>
-          <View style={styles.passwordRow}>
-            <TextInput
-              secureTextEntry={!showPassword}
-              placeholder="Enter your password"
-              placeholderTextColor={colors.mutedForeground}
-              style={[styles.input, styles.passwordInput]}
-              value={password}
-              onChangeText={setPassword}
-              textContentType="password"
-              autoComplete="password"
-              accessibilityLabel="Password"
-              testID="login-password"
-            />
-            <Pressable
-              onPress={() => setShowPassword((v) => !v)}
-              style={styles.showToggle}
-              accessibilityRole="button"
-              accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-            >
-              <Text style={styles.showToggleText}>{showPassword ? "Hide" : "Show"}</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        <PrimaryButton
-          label="Sign in"
-          loading={loading}
-          onPress={onSubmit}
-          disabled={!email.trim() || !password}
-          testID="login-submit"
-        />
 
         <Pressable
           onPress={() => router.push("/register")}
@@ -112,7 +134,8 @@ export default function LoginScreen() {
           style={styles.switchRow}
         >
           <Text style={styles.switchText}>
-            New to Manzil? <Text style={styles.switchLink}>Create an account</Text>
+            New to Manzil?{" "}
+            <Text style={styles.switchLink}>Create an account</Text>
           </Text>
         </Pressable>
 
@@ -132,15 +155,22 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingTop: spacing.md,
   },
-  brand: {
-    color: colors.primary,
-    fontFamily: typography.fonts.serifBold,
-    fontSize: typography.sizes["3xl"],
+  brandBlock: {
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+  goldRule: {
+    marginTop: spacing.md,
+    width: 48,
+    height: 1.5,
+    backgroundColor: colors.accent,
+    borderRadius: 2,
   },
   title: {
     color: colors.foreground,
     fontFamily: typography.fonts.serif,
     fontSize: typography.sizes["2xl"],
+    textAlign: "center",
   },
   subtitle: {
     color: colors.mutedForeground,
@@ -148,6 +178,15 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.base,
     lineHeight: 22,
     marginBottom: spacing.sm,
+    textAlign: "center",
+  },
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: radii["2xl"],
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.md,
   },
   field: {
     gap: spacing.xs,
@@ -158,13 +197,13 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
   },
   input: {
-    minHeight: 48,
+    minHeight: 52,
     borderWidth: 1,
     borderColor: colors.input,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     paddingHorizontal: spacing.md,
     color: colors.foreground,
-    backgroundColor: colors.card,
+    backgroundColor: colors.background,
     fontFamily: typography.fonts.sans,
     fontSize: typography.sizes.base,
   },
@@ -178,7 +217,7 @@ const styles = StyleSheet.create({
   showToggle: {
     position: "absolute",
     right: spacing.md,
-    height: 48,
+    height: 52,
     justifyContent: "center",
   },
   showToggleText: {
@@ -189,6 +228,16 @@ const styles = StyleSheet.create({
   error: {
     color: colors.destructive,
     fontFamily: typography.fonts.sans,
+    fontSize: typography.sizes.sm,
+  },
+  forgotRow: {
+    alignSelf: "flex-end",
+    minHeight: 40,
+    justifyContent: "center",
+  },
+  forgotText: {
+    color: colors.primary,
+    fontFamily: typography.fonts.sansSemibold,
     fontSize: typography.sizes.sm,
   },
   switchRow: {

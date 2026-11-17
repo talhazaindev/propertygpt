@@ -23,13 +23,15 @@ const styles = StyleSheet.create({
     gap: spacing.xs + 2,
     borderRadius: radii.full,
     backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.accent,
     paddingHorizontal: 10,
     paddingVertical: spacing.sm - 2,
   },
   label: {
     color: colors.primaryForeground,
-    fontFamily: typography.fonts.sans,
+    fontFamily: typography.fonts.sansSemibold,
     fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.medium,
+    letterSpacing: 0.2,
   },
 });

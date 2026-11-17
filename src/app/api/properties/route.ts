@@ -426,6 +426,14 @@ async function handleJsonCreate(
     );
   }
 
+  const { isAllowedMediaUrl } = await import("@/lib/media-url");
+  if (!imageUrls.every(isAllowedMediaUrl)) {
+    return NextResponse.json(
+      { error: "One or more image URLs are not allowed" },
+      { status: 400 }
+    );
+  }
+
   const rawDocs = Array.isArray(body.verificationDocuments)
     ? body.verificationDocuments
     : [];

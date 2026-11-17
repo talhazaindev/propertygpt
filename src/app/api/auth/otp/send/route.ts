@@ -7,6 +7,11 @@ import {
   OTP_EXPIRY_MINUTES,
   normalizeEmail,
 } from "@/lib/otp";
+import {
+  enforceRateLimits,
+  getClientIp,
+  rateLimitResponse,
+} from "@/lib/rate-limit";
 import { otpSendSchema } from "@/schemas/auth";
 
 export async function POST(request: Request) {
@@ -23,6 +28,18 @@ export async function POST(request: Request) {
 
     const email = normalizeEmail(validation.data.email);
     const { purpose } = validation.data;
+
+    const ip = getClientIp(request);
+    const limited = await enforceRateLimits([
+      { key: `otp-send:ip:${ip}`, limit: 10, windowSec: 60 * 60 },
+      { key: `otp-send:email:${email}`, limit: 5, windowSec: 60 * 60 },
+    ]);
+    if (limited) {
+      return rateLimitResponse(
+        limited,
+        "Too many verification emails. Try again later."
+      );
+    }
 
     if (purpose === "PASSWORD_RESET") {
       const [user, teamMember] = await Promise.all([

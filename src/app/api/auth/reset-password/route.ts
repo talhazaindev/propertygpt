@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import prisma from "@/lib/prismadb";
 import { normalizeEmail, verifySignupToken } from "@/lib/otp";
+import { revokeAllMobileSessions } from "@/lib/mobile-auth";
+import {
+  enforceRateLimits,
+  getClientIp,
+  rateLimitResponse,
+} from "@/lib/rate-limit";
 import { resetPasswordSchema } from "@/schemas/auth";
 
 export async function POST(request: Request) {
@@ -14,6 +20,14 @@ export async function POST(request: Request) {
         { error: "Invalid input data", issues: validation.error.issues },
         { status: 400 }
       );
+    }
+
+    const ip = getClientIp(request);
+    const limited = await enforceRateLimits([
+      { key: `reset-password:ip:${ip}`, limit: 10, windowSec: 60 * 60 },
+    ]);
+    if (limited) {
+      return rateLimitResponse(limited);
     }
 
     const email = normalizeEmail(validation.data.email);
@@ -32,10 +46,11 @@ export async function POST(request: Request) {
     ]);
 
     if (!user && !teamMember) {
-      return NextResponse.json(
-        { error: "No account found for this email" },
-        { status: 404 }
-      );
+      // Same generic success as a real update — do not leak account existence.
+      return NextResponse.json({
+        message:
+          "Password updated successfully. You can sign in with your new password.",
+      });
     }
 
     // Team members authenticate first in login — update that account when present
@@ -49,6 +64,7 @@ export async function POST(request: Request) {
         where: { id: user.id },
         data: { hashedPassword },
       });
+      await revokeAllMobileSessions(user.id);
     }
 
     // Invalidate outstanding password-reset OTPs for this email
